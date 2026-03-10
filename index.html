@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission: Connected — VA Disability Navigator</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="vLanding" class="view active">
+  <header class="l-header">
+    <div class="l-badge">M:C</div>
+    <div class="l-title">Mission: Connected</div>
+  </header>
+  <div class="l-hero">
+    <div class="l-tag">Free for Every Veteran</div>
+    <h1>Know What You're Entitled To. Get It.</h1>
+    <p>Answer a few questions and get a personalized VA disability roadmap — built around your branch, MOS, deployments, and symptoms.</p>
+    <button class="btn-start" onclick="startScreener()">Start Your Free Screening →</button>
+    <div class="l-note">🔒 No account. No signup. Takes about 5 minutes.</div>
+    <div id="devStatusBar" style="margin-top:16px;display:inline-flex;align-items:center;gap:12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:6px 16px;font-size:12px;color:rgba(255,255,255,.7);">
+      <span id="devAppStatus">⏳ App loading...</span>
+      <span style="opacity:.4;">|</span>
+      <span id="devApiStatus">⏳ Checking AI...</span>
+    </div>
+  </div>
+  <div class="trust-bar">
+    <div class="trust-item">✅ <strong>Free forever</strong> for veterans</div>
+    <div class="trust-item">🎖️ <strong>MOS-specific</strong> claim intelligence</div>
+    <div class="trust-item">📋 <strong>Personalized</strong> roadmap</div>
+    <div class="trust-item">🤖 <strong>AI-powered</strong> by Claude</div>
+    <div class="trust-item">📊 <strong>Case dashboard</strong> built-in</div>
+    <div class="trust-item">📄 <strong>Decision letter</strong> analysis</div>
+  </div>
+  <div class="l-features">
+    <div class="l-sec-title">Built by a Veteran, for Veterans</div>
+    <div class="l-sec-sub">Most veterans don't know what they're entitled to — and VSOs who charge fees are counting on it.</div>
+    <div class="feat-grid">
+      <div class="feat-card"><div class="feat-icon">🎯</div><div class="feat-title">MOS Intelligence</div><p class="feat-desc">Your military job tells us your exposures, noise levels, TERA status, and which conditions veterans in your specialty claim most.</p></div>
+      <div class="feat-card"><div class="feat-icon">📄</div><div class="feat-title">Decision Letter Analysis</div><p class="feat-desc">Upload a denial and the AI shows you favorable findings the VA already conceded — and exactly what one thing would flip the decision.</p></div>
+      <div class="feat-card"><div class="feat-icon">🗺️</div><div class="feat-title">Personalized Roadmap</div><p class="feat-desc">Color-coded claim blueprint — green for what you have, red for what's missing, with rating criteria and a clear action plan.</p></div>
+      <div class="feat-card"><div class="feat-icon">📊</div><div class="feat-title">Case Dashboard</div><p class="feat-desc">After your roadmap is confirmed, a live dashboard tracks every condition from planning to won — with a checklist for each step.</p></div>
+      <div class="feat-card"><div class="feat-icon">📖</div><div class="feat-title">CFR 38 Plain English</div><p class="feat-desc">The full VA regulation library in language anyone can understand. Know your rights before any VA appointment.</p></div>
+      <div class="feat-card"><div class="feat-icon">💬</div><div class="feat-title">AI Advisor Chat</div><p class="feat-desc">Ask anything. Get specific answers based on your profile — nexus letters, C&P prep, TDIU, SMC, PACT Act, and more.</p></div>
+    </div>
+  </div>
+  <div class="l-quote">
+    <p class="l-quote-text">"My first claim got denied — but two favorable findings were there and I didn't know it. I gave up for two years. That's why I built this. <strong>Nobody should have to fight alone.</strong>"</p>
+    <div class="l-quote-attr">— Founder, Mission: Connected · U.S. Army Veteran</div>
+  </div>
+  <footer class="l-footer">
+    <div class="l-footer-logo">⭐ MISSION: CONNECTED</div>
+    <div class="l-footer-disc">Educational guidance only. Not legal advice. For formal proceedings, consult an accredited VA attorney.</div>
+    <div style="display:flex;gap:18px;justify-content:center;"><a class="l-footer-link" href="mailto:sponsor@missionconnected.vet">Sponsor</a><a class="l-footer-link" href="mailto:hello@missionconnected.vet">Contact</a></div>
+  </footer>
+</div>
+
+<!-- SCREENER -->
+<div id="vScreener" class="view">
+  <header class="s-header">
+    <div class="s-badge">M:C</div>
+    <div class="s-logo">Mission: Connected</div>
+    <div class="s-progress">
+      <div class="s-step-text" id="sStepText">Step 1 of 15</div>
+      <div class="s-prog-bar"><div class="s-prog-fill" id="sProgFill" style="width:0%"></div></div>
+      <button class="s-btn-exit" onclick="if(confirm('Exit? Answers will be lost.'))showView('vLanding')">Exit</button>
+    </div>
+  </header>
+  <div class="s-body" id="sBody">
+
+    <!-- S1 GOAL -->
+    <div class="s-screen active" id="ss1">
+      <div class="s-label">Step 1 of 15</div>
+      <div class="s-question">What's your main goal today?</div>
+      <div class="s-subtext">This shapes your entire roadmap.</div>
+      <div class="choice-grid">
+        <div class="choice-card" data-val="first_time" onclick="pick(this,'goal')"><div class="choice-icon">📋</div><div><div class="choice-label">File my first VA disability claim</div><div class="choice-sub">Never filed before</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="increase" onclick="pick(this,'goal')"><div class="choice-icon">📈</div><div><div class="choice-label">Increase my current rating</div><div class="choice-sub">Already rated, want to go higher</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="secondary" onclick="pick(this,'goal')"><div class="choice-icon">🔗</div><div><div class="choice-label">Add secondary conditions</div><div class="choice-sub">Claim conditions caused by rated ones</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="appeal" onclick="pick(this,'goal')"><div class="choice-icon">⚖️</div><div><div class="choice-label">Appeal a denial or low rating</div><div class="choice-sub">VA denied or rated too low</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="healthcare" onclick="pick(this,'goal')"><div class="choice-icon">🏥</div><div><div class="choice-label">Get VA healthcare access</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="understand" onclick="pick(this,'goal')"><div class="choice-icon">❓</div><div><div class="choice-label">Understand what I'm entitled to</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S2 BRANCH -->
+    <div class="s-screen" id="ss2">
+      <div class="s-label">Step 2 of 15</div>
+      <div class="s-question">Which branch did you serve in?</div>
+      <div class="s-subtext">Select all that apply.</div>
+      <div class="choice-grid cols-3">
+        <div class="choice-card" data-val="Army" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">🪖</div><div><div class="choice-label">Army</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Navy" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">⚓</div><div><div class="choice-label">Navy</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Marine Corps" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">🦅</div><div><div class="choice-label">Marine Corps</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Air Force" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">✈️</div><div><div class="choice-label">Air Force</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Coast Guard" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">🚢</div><div><div class="choice-label">Coast Guard</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Space Force" onclick="pickMulti(this,'branch');updateBranchDisplay()"><div class="choice-icon">🚀</div><div><div class="choice-label">Space Force</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S3 COMPONENT -->
+    <div class="s-screen" id="ss3">
+      <div class="s-label">Step 3 of 15</div>
+      <div class="s-question">What component did you serve in?</div>
+      <div class="s-subtext">This affects how we approach your evidence strategy.</div>
+      <div class="choice-grid">
+        <div class="choice-card" data-val="Active Duty" onclick="pick(this,'component')"><div class="choice-icon">🎖️</div><div><div class="choice-label">Active Duty</div><div class="choice-sub">Full-time military service</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Reserve" onclick="pick(this,'component')"><div class="choice-icon">📅</div><div><div class="choice-label">Reserve</div><div class="choice-sub">Part-time with periodic activation</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="National Guard" onclick="pick(this,'component')"><div class="choice-icon">🏛️</div><div><div class="choice-label">National Guard</div><div class="choice-sub">State-controlled, federal activation</div></div><div class="choice-check">✓</div></div>
+      </div>
+      <div id="reserveNotice" style="display:none;margin-top:14px;font-size:12px;color:var(--text-sec);padding:8px 12px;background:var(--gray-50);border-radius:var(--r);border-left:3px solid var(--gray-300);">
+        ℹ️ Reserve/Guard veterans: your roadmap will prioritize civilian records and personal statements over service treatment records.
+      </div>
+    </div>
+
+    <!-- S4 DATES -->
+    <div class="s-screen" id="ss4">
+      <div class="s-label">Step 4 of 15</div>
+      <div class="s-question">When did you serve?</div>
+      <div class="s-subtext">Approximate dates are fine. Affects presumptive eligibility and era-specific benefits.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+        <div><div class="f-label" style="font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:5px;">Entry into service</div>
+        <select class="s-select" id="profStartYear" style="width:100%" onchange="ans.startYear=this.value"><option value="">Year...</option></select></div>
+        <div><div class="f-label" style="font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:5px;">Separation / ETS</div>
+        <select class="s-select" id="profEndYear" style="width:100%" onchange="ans.endYear=this.value"><option value="">Year...</option><option value="still_serving">Still Serving</option></select></div>
+      </div>
+      <div class="f-label" style="font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:10px;">Discharge status</div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Honorable" onclick="pick(this,'discharge')"><div class="choice-icon">🏅</div><div><div class="choice-label">Honorable</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="General / Honorable" onclick="pick(this,'discharge')"><div class="choice-icon">📄</div><div><div class="choice-label">General Under Honorable</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="OTH" onclick="pick(this,'discharge')"><div class="choice-icon">📋</div><div><div class="choice-label">Other Than Honorable</div><div class="choice-sub">May still qualify for some benefits</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Still Serving" onclick="pick(this,'discharge')"><div class="choice-icon">🎖️</div><div><div class="choice-label">Still Serving</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S5 MOS -->
+    <div class="s-screen" id="ss5">
+      <div class="s-label">Step 5 of 15</div>
+      <div class="s-question">What was your primary MOS / AFSC / Rate?</div>
+      <div class="s-subtext">Your job determines occupational exposures, noise level, and which conditions you're most likely to qualify for.</div>
+      <input class="mos-search" id="mosSearchInput" placeholder="🔍 Type to search your MOS..." oninput="filterMOSList(this.value)">
+      <div class="mos-branch-list" id="mosBranchList"></div>
+      <div class="mos-intel" id="mosIntel"></div>
+    </div>
+
+    <!-- S6 DEPLOYMENTS -->
+    <div class="s-screen" id="ss6">
+      <div class="s-label">Step 6 of 15</div>
+      <div class="s-question">Where did you deploy or serve?</div>
+      <div class="s-subtext">These unlock presumptive service connections. Select all that apply.</div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Iraq/Kuwait/SWA" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🏜️</div><div><div class="choice-label">Iraq / Kuwait / Southwest Asia</div><div class="choice-sub">Post 8/2/1990 · Gulf War · OIF/OEF</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Afghanistan" onclick="pickMulti(this,'deployments')"><div class="choice-icon">⛰️</div><div><div class="choice-label">Afghanistan</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Vietnam/SEA" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🌿</div><div><div class="choice-label">Vietnam / Southeast Asia</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Korea/DMZ" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🇰🇷</div><div><div class="choice-label">Korea / DMZ</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Europe/NATO" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🌍</div><div><div class="choice-label">Europe / NATO</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Pacific/OCONUS" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🌏</div><div><div class="choice-label">Pacific / Other OCONUS</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="CONUS_only" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🇺🇸</div><div><div class="choice-label">CONUS Only</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Other" onclick="pickMulti(this,'deployments')"><div class="choice-icon">🗺️</div><div><div class="choice-label">Other / Multiple</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S7 TOXIC EXPOSURE -->
+    <div class="s-screen" id="ss7">
+      <div class="s-label">Step 7 of 15</div>
+      <div class="s-question">Any toxic exposures during service?</div>
+      <div class="alert alert-amber"><span>⚠️</span><span>The <strong>PACT Act (2022)</strong> dramatically expanded presumptive eligibility. Many veterans qualify and haven't filed yet.</span></div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Burn pits" onclick="pickMulti(this,'exposures')"><div class="choice-icon">🔥</div><div><div class="choice-label">Burn Pits</div><div class="choice-sub">Open-air waste burning — Iraq, Afghanistan, etc.</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Agent Orange" onclick="pickMulti(this,'exposures')"><div class="choice-icon">🌿</div><div><div class="choice-label">Agent Orange</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Camp Lejeune water" onclick="pickMulti(this,'exposures')"><div class="choice-icon">💧</div><div><div class="choice-label">Camp Lejeune Water</div><div class="choice-sub">Served there 1953–1987</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Radiation" onclick="pickMulti(this,'exposures')"><div class="choice-icon">☢️</div><div><div class="choice-label">Radiation</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Asbestos" onclick="pickMulti(this,'exposures')"><div class="choice-icon">🚢</div><div><div class="choice-label">Asbestos</div><div class="choice-sub">Shipyards, older ships, certain buildings</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Chemical agents" onclick="pickMulti(this,'exposures')"><div class="choice-icon">⚗️</div><div><div class="choice-label">Chemical Agents</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="MST" onclick="pickMulti(this,'exposures')"><div class="choice-icon">🔒</div><div><div class="choice-label">Military Sexual Trauma</div><div class="choice-sub">Separate claim pathway</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="None known" onclick="pickMulti(this,'exposures')"><div class="choice-icon">✅</div><div><div class="choice-label">None that I'm aware of</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S8 VA STATUS -->
+    <div class="s-screen" id="ss8">
+      <div class="s-label">Step 8 of 15</div>
+      <div class="s-question">What's your current VA disability status?</div>
+      <div class="choice-grid">
+        <div class="choice-card" data-val="never_filed" onclick="pick(this,'vaStatus')"><div class="choice-icon">📋</div><div><div class="choice-label">Never filed a claim</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="0_percent" onclick="pick(this,'vaStatus')"><div class="choice-icon">📄</div><div><div class="choice-label">0% — filed but no compensation</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="rated_low" onclick="pick(this,'vaStatus')"><div class="choice-icon">📊</div><div><div class="choice-label">Currently rated 10%–60%</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="rated_high" onclick="pick(this,'vaStatus')"><div class="choice-icon">📈</div><div><div class="choice-label">Currently rated 70%–90%</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="100_percent" onclick="pick(this,'vaStatus')"><div class="choice-icon">🏆</div><div><div class="choice-label">100% — exploring SMC or protection</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="denied" onclick="pick(this,'vaStatus')"><div class="choice-icon">❌</div><div><div class="choice-label">Denied — want to appeal</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="pending" onclick="pick(this,'vaStatus')"><div class="choice-icon">⏳</div><div><div class="choice-label">Claim pending / in process</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S9 RATED CONDITIONS -->
+    <div class="s-screen" id="ss9">
+      <div class="s-label">Step 9 of 15</div>
+      <div class="s-question">Which conditions are you currently rated for?</div>
+      <div class="s-subtext">These become the foundation for secondary conditions.</div>
+      <div class="symptom-grid" id="ratedCondGrid"></div>
+      <div style="margin-top:14px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:5px;">Other rated conditions:</div>
+        <input class="s-input" id="otherRatedInput" placeholder="e.g., Plantar fasciitis, Sleep apnea, TBI...">
+      </div>
+    </div>
+
+    <!-- S10 SYMPTOMS -->
+    <div class="s-screen" id="ss10">
+      <div class="s-label">Step 10 of 15</div>
+      <div class="s-question">What symptoms are you experiencing?</div>
+      <div class="s-subtext">Select everything that applies. You don't need a formal diagnosis for many of these.</div>
+      <div class="alert alert-blue"><span>💡</span><span><strong>Tinnitus, migraines, and anxiety</strong> can be filed based on your own statement alone — no doctor's diagnosis required.</span></div>
+      <div class="symptom-grid" id="symptomGrid"></div>
+    </div>
+
+    <!-- S11 DIAGNOSES -->
+    <div class="s-screen" id="ss11">
+      <div class="s-label">Step 11 of 15</div>
+      <div class="s-question">Have any doctors given you a formal diagnosis?</div>
+      <div class="s-subtext">Select anything a doctor has ever told you — even years ago.</div>
+      <div class="symptom-grid" id="diagnosisGrid"></div>
+      <div style="margin-top:14px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text-sec);margin-bottom:5px;">Other diagnoses:</div>
+        <input class="s-input" id="otherDiagInput" placeholder="e.g., Degenerative disc disease, Anxiety disorder...">
+      </div>
+    </div>
+
+    <!-- S12 IN-SERVICE EVENTS -->
+    <div class="s-screen" id="ss12">
+      <div class="s-label">Step 12 of 15</div>
+      <div class="s-question">Did any of these happen during your service?</div>
+      <div class="s-subtext">In-service events establish the connection between your conditions and military service.</div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Combat / hostile fire zone" onclick="pickMulti(this,'events')"><div class="choice-icon">🎖️</div><div><div class="choice-label">Combat / Hostile Fire</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="IED blast / concussion / TBI" onclick="pickMulti(this,'events')"><div class="choice-icon">💥</div><div><div class="choice-label">IED Blast / Concussion / TBI</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Physical injury during training or duty" onclick="pickMulti(this,'events')"><div class="choice-icon">🤕</div><div><div class="choice-label">Physical Injury on Duty</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Heavy noise exposure" onclick="pickMulti(this,'events')"><div class="choice-icon">🔊</div><div><div class="choice-label">Heavy Noise Exposure</div><div class="choice-sub">Weapons, aircraft, machinery</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Military sexual trauma" onclick="pickMulti(this,'events')"><div class="choice-icon">🔒</div><div><div class="choice-label">Military Sexual Trauma</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Significant psychological stressor" onclick="pickMulti(this,'events')"><div class="choice-icon">🧠</div><div><div class="choice-label">Psychological Stressor</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Lifting / repetitive motion injury" onclick="pickMulti(this,'events')"><div class="choice-icon">🏋️</div><div><div class="choice-label">Lifting / Repetitive Motion</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Vehicle accident / fall / jump" onclick="pickMulti(this,'events')"><div class="choice-icon">🪂</div><div><div class="choice-label">Vehicle Accident / Jump / Fall</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Hazardous material exposure" onclick="pickMulti(this,'events')"><div class="choice-icon">⚗️</div><div><div class="choice-label">Hazardous Material Exposure</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Long-haul vehicle operations" onclick="pickMulti(this,'events')"><div class="choice-icon">🚛</div><div><div class="choice-label">Long-Haul Vehicle Operations</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Aviation / high-G exposure" onclick="pickMulti(this,'events')"><div class="choice-icon">✈️</div><div><div class="choice-label">Aviation / High-G Exposure</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Nothing specific" onclick="pickMulti(this,'events')"><div class="choice-icon">❓</div><div><div class="choice-label">Nothing Specific / Unsure</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S13 EVIDENCE -->
+    <div class="s-screen" id="ss13">
+      <div class="s-label">Step 13 of 15</div>
+      <div class="s-question">What evidence do you currently have?</div>
+      <div class="s-subtext">Don't worry if you have little — the AI will tell you what to get.</div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Service treatment records" onclick="pickMulti(this,'evidence')"><div class="choice-icon">📁</div><div><div class="choice-label">Service Treatment Records (STRs)</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Private medical records" onclick="pickMulti(this,'evidence')"><div class="choice-icon">🏥</div><div><div class="choice-label">Private Medical Records</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="VA medical records" onclick="pickMulti(this,'evidence')"><div class="choice-icon">🏛️</div><div><div class="choice-label">VA Medical Records</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Nexus letter from doctor" onclick="pickMulti(this,'evidence')"><div class="choice-icon">📝</div><div><div class="choice-label">Nexus Letter</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Buddy statements" onclick="pickMulti(this,'evidence')"><div class="choice-icon">🤝</div><div><div class="choice-label">Buddy Statements</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="DD-214" onclick="pickMulti(this,'evidence')"><div class="choice-icon">🎖️</div><div><div class="choice-label">DD-214</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="C&P exam results" onclick="pickMulti(this,'evidence')"><div class="choice-icon">📊</div><div><div class="choice-label">C&P Exam Results</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="VA decision letter" onclick="pickMulti(this,'evidence')"><div class="choice-icon">📮</div><div><div class="choice-label">VA Decision / Denial Letter</div><div class="choice-sub">Upload for AI analysis</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="None yet" onclick="pickMulti(this,'evidence')"><div class="choice-icon">🔍</div><div><div class="choice-label">None yet — starting fresh</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S14 LIFE IMPACT -->
+    <div class="s-screen" id="ss14">
+      <div class="s-label">Step 14 of 15</div>
+      <div class="s-question">How are your symptoms impacting daily life?</div>
+      <div class="s-subtext">This helps identify TDIU eligibility and the right rating level.</div>
+      <div class="choice-grid cols-2">
+        <div class="choice-card" data-val="Unable to work" onclick="pickMulti(this,'impact')"><div class="choice-icon">💼</div><div><div class="choice-label">Can't Work</div><div class="choice-sub">Disabilities prevent employment</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Significant work limitations" onclick="pickMulti(this,'impact')"><div class="choice-icon">⚠️</div><div><div class="choice-label">Work Limitations</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Sleep disruption / insomnia" onclick="pickMulti(this,'impact')"><div class="choice-icon">😴</div><div><div class="choice-label">Sleep Problems</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Relationship difficulties" onclick="pickMulti(this,'impact')"><div class="choice-icon">👥</div><div><div class="choice-label">Relationship / Social Issues</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Daily chronic pain" onclick="pickMulti(this,'impact')"><div class="choice-icon">💊</div><div><div class="choice-label">Chronic Pain</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Mobility limitations" onclick="pickMulti(this,'impact')"><div class="choice-icon">🦽</div><div><div class="choice-label">Mobility Limitations</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Mental health affecting daily life" onclick="pickMulti(this,'impact')"><div class="choice-icon">🧠</div><div><div class="choice-label">Mental Health Impact</div></div><div class="choice-check">✓</div></div>
+        <div class="choice-card" data-val="Manageable" onclick="pickMulti(this,'impact')"><div class="choice-icon">✅</div><div><div class="choice-label">Manageable / Mostly controlled</div></div><div class="choice-check">✓</div></div>
+      </div>
+    </div>
+
+    <!-- S15 AI FOLLOW-UP -->
+    <div class="s-screen" id="ss15">
+      <div class="s-label">Step 15 of 15</div>
+      <div class="s-question">A few more questions — just for you</div>
+      <div class="s-subtext">Based on your answers, the AI generated personalized follow-up questions to strengthen your roadmap.</div>
+      <div id="followupContainer">
+        <div style="text-align:center;padding:32px;color:var(--text-hint);">
+          <div class="loading-ring" style="width:40px;height:40px;border-width:4px;"></div>
+          <div style="margin-top:12px;font-size:14px;">Generating your questions...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S16 LOADING -->
+    <div class="s-screen" id="ss16">
+      <div class="loading-wrap">
+        <div class="loading-ring"></div>
+        <div class="loading-title">Building Your Roadmap</div>
+        <div style="font-size:15px;color:var(--text-sec);margin-bottom:28px;line-height:1.6;">Analyzing your service history, MOS, exposures,<br>and symptoms to build your personalized blueprint.</div>
+        <div id="loadingSteps">
+          <div class="loading-step active" id="ls1">🔍 Reviewing your service history and MOS...</div>
+          <div class="loading-step" id="ls2">📋 Identifying ratable conditions...</div>
+          <div class="loading-step" id="ls3">⚗️ Checking PACT Act and presumptive coverage...</div>
+          <div class="loading-step" id="ls4">🔗 Finding secondary condition opportunities...</div>
+          <div class="loading-step" id="ls5">📊 Calculating rating criteria...</div>
+          <div class="loading-step" id="ls6">🗺️ Building your action plan...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="s-nav" id="sNav">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="btn-back" id="btnBack" onclick="prevScreen()" disabled>← Back</button>
+      <span class="s-skip" id="btnSkip" onclick="skipScreen()">Skip this step</span>
+    </div>
+    <button class="btn-next" id="btnNext" onclick="nextScreen()">Continue →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="vApp" class="view">
+  <header class="a-top">
+    <div class="a-badge" onclick="showView('vLanding')">M:C</div>
+    <div class="a-logo" onclick="showPage('roadmap')">Mission: Connected</div>
+    <div class="a-top-r">
+      <span style="font-size:12px;color:rgba(255,255,255,.6);border-right:1px solid rgba(255,255,255,.2);padding-right:10px;">Powered by <strong style="color:var(--gold);">Your Sponsor</strong></span>
+      <div class="a-ai-dot"><span></span> AI Ready</div>
+      <button class="btn-retake" onclick="retakeScreener()">Update Screening</button>
+    </div>
+  </header>
+  <div class="a-layout">
+    <nav class="a-sidebar">
+      <div class="sb-vet" id="sbVet">
+        <div class="sb-vet-name" id="sbName">Veteran</div>
+        <div class="sb-vet-meta" id="sbMeta">Profile complete</div>
+        <div class="sb-rating" id="sbRating">View Roadmap</div>
+      </div>
+      <div class="nav-grp">My Plan</div>
+      <div class="nav-item active" id="nav-roadmap" onclick="showPage('roadmap')"><span class="nav-icon">🗺️</span> My Roadmap</div>
+      <div class="nav-item" id="nav-dashboard" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Case Dashboard <span class="nav-badge">NEW</span></div>
+      <div class="nav-item" id="nav-chat" onclick="showPage('chat')"><span class="nav-icon">💬</span> AI Advisor</div>
+      <div class="nav-grp">Tools</div>
+      <div class="nav-item" id="nav-tracker" onclick="showPage('tracker')"><span class="nav-icon">📋</span> Condition Tracker</div>
+      <div class="nav-item" id="nav-records" onclick="showPage('records')"><span class="nav-icon">📄</span> Records &amp; Letters</div>
+      <div class="nav-item" id="nav-regulations" onclick="showPage('regulations')"><span class="nav-icon">📖</span> VA Regulations</div>
+      <div class="nav-grp">VA Links</div>
+      <div class="nav-item" onclick="window.open('https://www.va.gov/disability/','_blank')"><span class="nav-icon">🔗</span> VA.gov</div>
+      <div class="nav-item" onclick="window.open('https://www.ebenefits.va.gov','_blank')"><span class="nav-icon">🔗</span> eBenefits</div>
+      <div class="sb-bottom">
+        <div class="sponsor-slot" onclick="alert('Contact: sponsor@missionconnected.vet')">Your organization here<br><span style="color:var(--blue-mid);font-size:10px;">→ Become a sponsor</span></div>
+      </div>
+    </nav>
+    <main class="a-main">
+
+      <!-- ROADMAP PAGE -->
+      <div class="page active" id="page-roadmap">
+        <div class="pg-hdr">
+          <div>
+            <div class="pg-title">My Claim Roadmap</div>
+            <div class="pg-sub" id="roadmapSub">Personalized from your screening</div>
+          </div>
+          <div style="display:flex;gap:8px;" class="no-print">
+            <button class="btn btn-outline" onclick="printRoadmap()">🖨️ Print / PDF</button>
+            <button class="btn btn-outline" onclick="emailRoadmap()">✉️ Email</button>
+            <button class="btn btn-primary" onclick="showPage('chat')">💬 Ask Aylene</button>
+          </div>
+        </div>
+        <div id="roadmapContent">
+          <div class="empty-state"><div style="font-size:32px;margin-bottom:10px;">🗺️</div>Complete the screener to see your roadmap.</div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD PAGE -->
+      <div class="page" id="page-dashboard">
+        <div class="pg-hdr">
+          <div>
+            <div class="pg-title">Case Dashboard</div>
+            <div class="pg-sub">Track every condition from planning to won</div>
+          </div>
+        </div>
+        <div id="dashContent">
+          <div class="empty-state"><div style="font-size:32px;margin-bottom:10px;">📊</div>Confirm your roadmap to activate your dashboard.</div>
+        </div>
+      </div>
+
+      <!-- CHAT PAGE -->
+      <div class="page" id="page-chat">
+        <div class="pg-hdr">
+          <div>
+            <div class="pg-title">AI Advisor</div>
+            <div class="pg-sub">Aylene — your personal claims guide</div>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="chat-wrap">
+            <div class="chat-topbar">
+              <div class="chat-av">A</div>
+              <div>
+                <div style="font-size:14px;font-weight:600;color:var(--blue);">Aylene — Claims Advisor</div>
+                <div style="font-size:12px;color:var(--text-sec);">Your AI claims guide · 38 CFR · TDIU · SMC · Appeals</div>
+              </div>
+              <button class="btn btn-outline no-print" style="margin-left:auto;font-size:12px;padding:5px 12px;" onclick="clearChat()">Clear</button>
+            </div>
+            <div class="chat-msgs" id="chatMsgs"></div>
+            <div class="chat-input-area">
+              <div class="chat-row">
+                <textarea class="chat-ta" id="chatInput" rows="1" placeholder="Ask Aylene anything about your VA claim..." onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+                <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
+              </div>
+              <div class="chat-hint"><kbd>Enter</kbd> send &nbsp; <kbd>Shift+Enter</kbd> new line</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRACKER PAGE -->
+      <div class="page" id="page-tracker">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Condition Tracker</div><div class="pg-sub">Your complete claim list — synced with the case dashboard</div></div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-icon si-b">📊</div><div><div class="stat-val" id="st-combined">0%</div><div class="stat-lbl">Combined Rating</div></div></div>
+          <div class="stat-card"><div class="stat-icon si-g">✅</div><div><div class="stat-val" id="st-connected">0</div><div class="stat-lbl">Won / Connected</div></div></div>
+          <div class="stat-card"><div class="stat-icon si-a">⏳</div><div><div class="stat-val" id="st-pending">0</div><div class="stat-lbl">Filed / Pending</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">📋 All Conditions</div><button class="btn btn-primary" onclick="openAddModal()">＋ Add Condition</button></div>
+          <table class="cond-table">
+            <thead><tr><th>Condition</th><th>Rating</th><th>Status</th><th>Diag. Code</th><th></th></tr></thead>
+            <tbody id="trackerBody"><tr><td colspan="5"><div class="empty-state">No conditions yet.</div></td></tr></tbody>
+          </table>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--blue-pale);border-top:2px solid var(--blue-light);">
+            <span style="font-size:13px;font-weight:600;color:var(--blue);">VA Combined (Whole Person Method)</span>
+            <span style="font-size:18px;font-weight:700;color:var(--blue);" id="trackerCombined">0%</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+          <div class="card"><div class="card-hdr"><div class="card-title">📐 How Combined Ratings Work</div></div>
+            <div style="font-size:13px;color:var(--text-sec);line-height:1.75;">The VA uses the <strong style="color:var(--text);">Whole Person Method</strong>. Each rating applies to the remaining "able" percentage.<br><br>
+            <strong>Example:</strong> 50% + 30% → 30% of remaining 50% = 15%. Combined = 65%, rounds to <span style="color:var(--blue);font-weight:700;">70%</span>.</div>
+          </div>
+          <div class="card"><div class="card-hdr"><div class="card-title">🏁 Rating Milestones</div></div>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+              <div style="display:flex;gap:10px;"><span style="font-weight:700;color:var(--blue);width:38px;">10%</span><span style="color:var(--text-sec);">Compensation begins</span></div>
+              <div style="display:flex;gap:10px;"><span style="font-weight:700;color:var(--blue);width:38px;">30%</span><span style="color:var(--text-sec);">Dependent allowances</span></div>
+              <div style="display:flex;gap:10px;"><span style="font-weight:700;color:var(--blue);width:38px;">50%</span><span style="color:var(--text-sec);">CHAMPVA eligibility</span></div>
+              <div style="display:flex;gap:10px;"><span style="font-weight:700;color:var(--blue);width:38px;">70%</span><span style="color:var(--text-sec);">TDIU threshold</span></div>
+              <div style="display:flex;gap:10px;"><span style="font-weight:700;color:var(--blue);width:38px;">100%</span><span style="color:var(--text);font-weight:600;">Full + P&amp;T 🎯</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECORDS PAGE -->
+      <div class="page" id="page-records">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Records &amp; Decision Letters</div><div class="pg-sub">Upload records for AI analysis — or a denial letter to find what the VA already conceded</div></div>
+        </div>
+        <div class="alert alert-blue"><span>💡</span><span><strong>Decision letters are not dead ends.</strong> Even a denial usually contains favorable findings. Upload yours and the AI shows you exactly what to do next.</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">📮 Decision Letter / Rating Decision</div></div>
+            <div class="upload-zone" id="dlUploadZone" style="padding:24px 18px;">
+              <input type="file" id="dlFileInput" accept=".pdf,.txt,.doc,.docx" onchange="handleDLUpload(this.files)">
+              <div style="font-size:26px;margin-bottom:7px;">📮</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">Drop your denial or rating decision here</div>
+              <div style="font-size:12px;color:var(--text-sec);">PDF, Word, or text file</div>
+            </div>
+            <div id="dlFileList"></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">📁 Medical / Service Records</div></div>
+            <div class="upload-zone" id="medUploadZone" style="padding:24px 18px;">
+              <input type="file" id="medFileInput" accept=".pdf,.txt,.doc,.docx" multiple onchange="handleMedUpload(this.files)">
+              <div style="font-size:26px;margin-bottom:7px;">📁</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">Service records, C&amp;P exams, medical files</div>
+              <div style="font-size:12px;color:var(--text-sec);">Drop multiple files at once</div>
+            </div>
+            <div id="medFileList"></div>
+          </div>
+        </div>
+        <div class="card" id="dlAnalysisCard" style="display:none;margin-bottom:14px;">
+          <div class="card-hdr"><div class="card-title">📮 Decision Letter Analysis</div><button class="btn btn-outline" onclick="clearDL()">Clear</button></div>
+          <div id="dlAnalysisContent"></div>
+        </div>
+        <div class="card" id="medAnalysisCard" style="display:none;">
+          <div class="card-hdr"><div class="card-title">🤖 Medical Record Analysis</div><button class="btn btn-outline" onclick="clearMed()">Clear All</button></div>
+          <div id="medAnalysisContent"></div>
+        </div>
+      </div>
+
+      <!-- REGULATIONS PAGE -->
+      <div class="page" id="page-regulations">
+        <div class="pg-hdr">
+          <div><div class="pg-title">VA Regulations</div><div class="pg-sub">CFR Title 38 in plain language — know your rights</div></div>
+        </div>
+        <div class="regs-wrap">
+          <div class="regs-sb">
+            <div class="regs-search-wrap"><input class="regs-search-input" placeholder="🔍 Search..." id="regsSearch" oninput="filterRegs(this.value)"></div>
+            <div class="regs-tree" id="regsTree"></div>
+          </div>
+          <div class="regs-content">
+            <div class="regs-chdr"><div class="regs-ctitle" id="regsTitle">Select a regulation</div><div class="regs-ccode" id="regsCode">Choose from the left panel</div></div>
+            <div class="regs-body" id="regsBody"><div class="empty-state" style="padding:60px 20px;"><div style="font-size:32px;margin-bottom:10px;">📖</div>Select a regulation to read it here.</div></div>
+            <div class="ask-ai-bar"><input class="ask-ai-input" id="regsInput" placeholder="Ask Aylene about this regulation..." onkeydown="if(event.key==='Enter')askRegsAI()"><button class="btn-ask" id="regsBtn" onclick="askRegsAI()">Ask Aylene</button></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ADD / EDIT CONDITION MODAL -->
+<div class="m-overlay" id="addModal">
+  <div class="modal">
+    <div class="m-hdr"><div class="m-title" id="mModalTitle">Add a Condition</div><button class="btn-close" onclick="closeModal()">×</button></div>
+    <div class="m-body">
+      <div class="f-group"><label class="f-label">Condition / Diagnosis *</label><input class="f-input" id="mName" placeholder="e.g., Tinnitus, PTSD, Lumbar Disc Herniation"></div>
+      <div class="f-row">
+        <div class="f-group"><label class="f-label">VA Rating (if already rated)</label>
+          <select class="f-select" id="mRating"><option value="0">Not rated yet</option><option>10%</option><option>20%</option><option>30%</option><option>40%</option><option>50%</option><option>60%</option><option>70%</option><option>80%</option><option>90%</option><option>100%</option></select>
+        </div>
+        <div class="f-group"><label class="f-label">Current Status</label>
+          <select class="f-select" id="mStatus">
+            <option value="todo">To Do — Not started</option>
+            <option value="inprog">In Progress — Gathering evidence</option>
+            <option value="filed">Filed — Waiting on VA</option>
+            <option value="won">Won — Service connected</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-row">
+        <div class="f-group"><label class="f-label">Diagnostic Code (optional)</label><input class="f-input" id="mCode" placeholder="e.g., 5242, 9411"></div>
+        <div class="f-group"><label class="f-label">Secondary To (if applicable)</label><input class="f-input" id="mSecondary" placeholder="e.g., PTSD, Diabetes"></div>
+      </div>
+      <div class="f-group"><label class="f-label">Notes</label><textarea class="f-textarea" id="mNotes" placeholder="Evidence gathered, next steps, context..."></textarea></div>
+    </div>
+    <div class="m-foot"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="mSaveBtn" onclick="addClaim()">Add Condition</button></div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
