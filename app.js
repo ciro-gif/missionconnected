@@ -9,8 +9,8 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const CLAUDE_KEY = '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';
 const CLAUDE_MODEL = 'claude-opus-4-5';
 
-let supabase = null;
-try { supabase = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('Supabase init failed'); }
+let sbClient = null;
+try { sbClient = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('Supabase init failed'); }
 
 // ── STATE ──
 let currentUser = null;
@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkAuthState() {
-  if (!supabase) return;
-  const { data: { session } } = await supabase.auth.getSession();
+  if (!sbClient) return;
+  const { data: { session } } = await sbClient.auth.getSession();
   if (session?.user) setUser(session.user);
-  supabase.auth.onAuthStateChange((event, session) => {
+  sbClient.auth.onAuthStateChange((event, session) => {
     if (session?.user) setUser(session.user);
     else { currentUser = null; updateTopbar(); }
   });
@@ -83,12 +83,12 @@ function updateTopbar() {
 }
 
 async function loadUserData() {
-  if (!supabase || !currentUser) return;
+  if (!sbClient || !currentUser) return;
   try {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    const { data: profile } = await sbClient.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile?.screener_data) Object.assign(ans, profile.screener_data);
     if (profile?.roadmap_text) { roadmapData = profile.roadmap_text; }
-    const { data: claims } = await supabase.from('claims').select('*').eq('user_id', currentUser.id);
+    const { data: claims } = await sbClient.from('claims').select('*').eq('user_id', currentUser.id);
     if (claims?.length) { conditions = claims; }
     if (roadmapData) renderRoadmap(roadmapData);
     if (conditions.length) renderDashboard();
@@ -153,7 +153,7 @@ function showAuthError(msg) {
 }
 
 async function handleAuthSubmit() {
-  if (!supabase) { showAuthError('Authentication service not available.'); return; }
+  if (!sbClient) { showAuthError('Authentication service not available.'); return; }
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   if (!email || !password) { showAuthError('Please enter your email and password.'); return; }
@@ -163,10 +163,10 @@ async function handleAuthSubmit() {
   try {
     let result;
     if (authMode === 'signup') {
-      result = await supabase.auth.signUp({ email, password });
+      result = await sbClient.auth.signUp({ email, password });
       if (result.error) throw result.error;
       if (result.data?.user) {
-        await supabase.from('profiles').upsert({ id: result.data.user.id, screener_data: ans });
+        await sbClient.from('profiles').upsert({ id: result.data.user.id, screener_data: ans });
         setUser(result.data.user);
         closeAuth();
         if (roadmapData) saveRoadmapToSupabase();
@@ -174,7 +174,7 @@ async function handleAuthSubmit() {
         showAuthError('Check your email to confirm your account.');
       }
     } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
+      result = await sbClient.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
       setUser(result.data.user);
       closeAuth();
@@ -187,16 +187,16 @@ async function handleAuthSubmit() {
 }
 
 async function signOut() {
-  if (supabase) await supabase.auth.signOut();
+  if (sbClient) await sbClient.auth.signOut();
   currentUser = null; roadmapData = null; conditions = []; chatHistory = [];
   updateTopbar();
   showView('vLanding');
 }
 
 async function saveRoadmapToSupabase() {
-  if (!supabase || !currentUser || !roadmapData) return;
+  if (!sbClient || !currentUser || !roadmapData) return;
   try {
-    await supabase.from('profiles').upsert({
+    await sbClient.from('profiles').upsert({
       id: currentUser.id, screener_data: ans, roadmap_text: roadmapData
     });
   } catch(e) { console.warn('Save error:', e); }
@@ -727,17 +727,17 @@ function advanceCondition(condId) {
 }
 
 async function saveConditions() {
-  if (!supabase || !currentUser) return;
+  if (!sbClient || !currentUser) return;
   try {
     for (const c of conditions) {
       if (c.id?.startsWith('local-')) {
-        const { data } = await supabase.from('claims').insert({
+        const { data } = await sbClient.from('claims').insert({
           user_id: currentUser.id, name: c.name, rating: c.rating||0,
           col: c.col, type: c.type, checks: c.checks
         }).select().single();
         if (data) c.id = data.id;
       } else {
-        await supabase.from('claims').update({ col: c.col, checks: c.checks, rating: c.rating }).eq('id', c.id);
+        await sbClient.from('claims').update({ col: c.col, checks: c.checks, rating: c.rating }).eq('id', c.id);
       }
     }
   } catch(e) { console.warn('Save conditions error:', e); }
