@@ -23,6 +23,11 @@
   </nav>
 
   <section class="l-hero">
+    <div class="l-hero-bg">
+      <img class="l-hero-img l-hero-img-1" src="https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=800&q=70&auto=format" alt="Veteran" loading="eager">
+      <img class="l-hero-img l-hero-img-2" src="https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=800&q=70&auto=format" alt="Consultation" loading="eager">
+      <img class="l-hero-img l-hero-img-3" src="https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800&q=70&auto=format" alt="Veterans" loading="eager">
+    </div>
     <div class="l-hero-inner">
       <div class="l-hero-tag">🎖️ Free for Every Veteran — Always</div>
       <h1>Your VA Benefits.<br><span>Understood. Finally.</span></h1>
@@ -130,6 +135,71 @@
     </div>
   </section>
 
+  <section class="l-section l-preview-section">
+    <div class="l-section-inner">
+      <div class="l-section-tag">What It Looks Like</div>
+      <div class="l-section-title">Your Command Center — Built Around You</div>
+      <div class="l-section-sub">Once you complete the screener, you get a full personalized dashboard. Here's a preview of what one veteran's claim roadmap looks like.</div>
+      <div class="l-preview-wrap">
+        <!-- MOCK TOPBAR -->
+        <div class="preview-topbar">
+          <div class="preview-logo"><span class="preview-badge">M:C</span> Mission: Connected</div>
+          <div class="preview-tb-right"><span class="preview-ai-dot"></span> AI Ready &nbsp;·&nbsp; <span style="color:#C9A84C">★ J. Martinez, Army</span></div>
+        </div>
+        <div class="preview-layout">
+          <!-- MOCK SIDEBAR -->
+          <div class="preview-sidebar">
+            <div class="preview-nav-item active">🗺️ My Roadmap</div>
+            <div class="preview-nav-item">📊 Dashboard</div>
+            <div class="preview-nav-item">💬 Ask Aylene</div>
+            <div class="preview-nav-item">📋 Tracker</div>
+            <div class="preview-nav-item">📁 Records</div>
+          </div>
+          <!-- MOCK CONTENT -->
+          <div class="preview-content">
+            <div class="preview-hero-banner">
+              <div>
+                <div class="preview-hero-title">🎯 7 Conditions Identified</div>
+                <div class="preview-hero-sub">Army · 11B Infantryman · OIF/OEF · Burn Pit Exposure</div>
+              </div>
+              <div class="preview-rating-chip">Est. 80–90% Combined</div>
+            </div>
+            <div class="preview-cond-list">
+              <div class="preview-cond-card border-direct">
+                <div class="preview-cond-name">PTSD</div>
+                <span class="preview-badge-type direct">Direct</span>
+                <span class="preview-prio high">HIGH</span>
+                <div class="preview-cond-action">📝 Get nexus letter → Rate 70%</div>
+              </div>
+              <div class="preview-cond-card border-presumptive">
+                <div class="preview-cond-name">Constrictive Bronchiolitis</div>
+                <span class="preview-badge-type presumptive">Presumptive</span>
+                <span class="preview-prio high">HIGH</span>
+                <div class="preview-cond-action">⚗️ PACT Act — No nexus needed</div>
+              </div>
+              <div class="preview-cond-card border-direct">
+                <div class="preview-cond-name">Tinnitus</div>
+                <span class="preview-badge-type direct">Direct</span>
+                <span class="preview-prio medium">MED</span>
+                <div class="preview-cond-action">📋 Lay statement sufficient</div>
+              </div>
+              <div class="preview-cond-card border-secondary">
+                <div class="preview-cond-name">Sleep Apnea</div>
+                <span class="preview-badge-type secondary">Secondary</span>
+                <span class="preview-prio medium">MED</span>
+                <div class="preview-cond-action">↳ Secondary to PTSD</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-blur-overlay">
+          <button class="btn-hero-primary" onclick="startScreener()" style="font-size:14px;padding:12px 28px">Get Your Personalized Roadmap →</button>
+          <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:10px">Free · 5 minutes · No account required</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="l-section l-manifesto">
     <div class="l-section-inner">
       <div class="l-manifesto-inner">
@@ -161,6 +231,7 @@
 <!-- AUTH MODAL -->
 <div class="auth-overlay" id="authOverlay">
   <div class="auth-modal">
+    <button class="auth-close-btn" onclick="closeAuth()">✕</button>
     <div class="auth-modal-hdr">
       <div class="auth-badge-row"><div class="auth-badge-icon">M:C</div><div class="auth-badge-name">Mission: Connected</div></div>
       <div class="auth-modal-title" id="authModalTitle">Welcome Back</div>
@@ -171,19 +242,106 @@
         <div class="auth-tab active" id="tabSignin" onclick="switchAuthTab('signin')">Sign In</div>
         <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Create Account</div>
       </div>
-      <div class="auth-value-prop"><strong>📋 Free account unlocks:</strong> Save your roadmap · Chat with Aylene · Track your case · Upload records</div>
+
+      <!-- SIGNUP EXTRA FIELDS (hidden for signin) -->
+      <div id="signupFields" style="display:none">
+        <div class="auth-value-prop"><strong>📋 Free account unlocks:</strong> Save your roadmap · Chat with Aylene · Track your case · Upload records</div>
+        <div class="auth-field">
+          <label class="auth-label">Full Name</label>
+          <input class="auth-input" type="text" id="authFullName" placeholder="First Last" autocomplete="name">
+        </div>
+        <div class="auth-field-row">
+          <div class="auth-field">
+            <label class="auth-label">Phone Number</label>
+            <input class="auth-input" type="tel" id="authPhone" placeholder="(555) 555-5555" autocomplete="tel">
+          </div>
+          <div class="auth-field">
+            <label class="auth-label">State of Residency</label>
+            <select class="auth-input" id="authState">
+              <option value="">Select state...</option>
+              <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option>
+              <option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
+              <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+              <option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+              <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option>
+              <option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
+              <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+              <option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+              <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option>
+              <option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+            </select>
+          </div>
+        </div>
+        <div class="auth-field-row">
+          <div class="auth-field">
+            <label class="auth-label">Birth Month</label>
+            <select class="auth-input" id="authBirthMonth">
+              <option value="">Month...</option>
+              <option value="01">January</option><option value="02">February</option>
+              <option value="03">March</option><option value="04">April</option>
+              <option value="05">May</option><option value="06">June</option>
+              <option value="07">July</option><option value="08">August</option>
+              <option value="09">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+          </div>
+          <div class="auth-field">
+            <label class="auth-label">Birth Year</label>
+            <select class="auth-input" id="authBirthYear">
+              <option value="">Year...</option>
+              ${Array.from({length:80},(_,i)=>2005-i).map(y=>`<option value="${y}">${y}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="auth-field">
         <label class="auth-label">Email Address</label>
-        <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com">
+        <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" autocomplete="email">
       </div>
       <div class="auth-field">
         <label class="auth-label">Password</label>
-        <input class="auth-input" type="password" id="authPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuthSubmit()">
+        <input class="auth-input" type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter'&&authMode==='signin')handleAuthSubmit()">
       </div>
+      <div class="auth-field" id="confirmPwField" style="display:none">
+        <label class="auth-label">Confirm Password</label>
+        <input class="auth-input" type="password" id="authPasswordConfirm" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')handleAuthSubmit()">
+      </div>
+
+      <!-- PRIVACY POLICY CHECKBOX (signup only) -->
+      <div class="auth-privacy" id="authPrivacyRow" style="display:none">
+        <label class="auth-privacy-label">
+          <input type="checkbox" id="authPrivacy">
+          <span>I agree to the <a href="#privacy" onclick="showPrivacyPolicy();return false;">Privacy Policy</a>. My information will never be sold or shared with third parties.</span>
+        </label>
+      </div>
+
       <div class="auth-error" id="authError"></div>
       <button class="btn-auth-submit" id="authSubmitBtn" onclick="handleAuthSubmit()">Sign In</button>
-      <div class="auth-dismiss">No account? <span onclick="closeAuth()">Continue without one →</span></div>
+      <div class="auth-dismiss" id="authDismissRow">No account? <span onclick="closeAuth()">Continue without one →</span></div>
     </div>
+  </div>
+</div>
+
+<!-- PRIVACY POLICY MODAL -->
+<div class="m-overlay" id="privacyModal">
+  <div class="modal" style="max-width:560px">
+    <div class="m-hdr"><div class="m-title">Privacy Policy</div><button class="btn-close" onclick="closeModal('privacyModal')">✕</button></div>
+    <div class="m-body" style="max-height:400px;overflow-y:auto;line-height:1.8;font-size:14px;color:#374151">
+      <p><strong>Mission: Connected</strong> is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.</p>
+      <h4 style="margin:16px 0 6px">What We Collect</h4>
+      <p>We collect only what you provide: name, email, phone, state, birth month/year, and your VA screener answers. No sensitive financial data is ever collected.</p>
+      <h4 style="margin:16px 0 6px">How We Use It</h4>
+      <p>Your information is used solely to generate and save your personalized VA disability roadmap. It is never sold, rented, shared, or used for advertising — ever.</p>
+      <h4 style="margin:16px 0 6px">Data Security</h4>
+      <p>All data is encrypted in transit and at rest via Supabase infrastructure. Passwords are hashed and never stored in plain text.</p>
+      <h4 style="margin:16px 0 6px">Your Rights</h4>
+      <p>You may request deletion of your account and all associated data at any time by emailing <a href="mailto:hello@missionconnected.vet">hello@missionconnected.vet</a>.</p>
+      <h4 style="margin:16px 0 6px">No Third-Party Sharing</h4>
+      <p>We do not share your data with the VA, insurance companies, attorneys, advertisers, or any other third party. Period.</p>
+      <p style="margin-top:16px;color:#9CA3AF;font-size:12px">Last updated: March 2026</p>
+    </div>
+    <div class="m-foot"><button class="btn btn-primary" onclick="closeModal('privacyModal');document.getElementById('authPrivacy').checked=true">I Understand — Close</button></div>
   </div>
 </div>
 
@@ -435,6 +593,7 @@
       <div class="nav-item" id="nav-tracker" onclick="showPage('tracker')"><span class="nav-icon">📋</span> Condition Tracker</div>
       <div class="nav-item" id="nav-records" onclick="showPage('records')"><span class="nav-icon">📁</span> My Records</div>
       <div class="nav-item" id="nav-regulations" onclick="showPage('regulations')"><span class="nav-icon">📖</span> VA Regulations</div>
+      <div class="nav-item" id="nav-activity" onclick="showPage('activity')"><span class="nav-icon">📋</span> Activity Log <span class="nav-badge" id="activityBadge">0</span></div>
       <div class="nav-section-label">Quick Links</div>
       <div class="nav-item" onclick="window.open('https://www.va.gov/disability/','_blank')"><span class="nav-icon">🔗</span> VA.gov</div>
       <div class="nav-item" onclick="window.open('https://www.ebenefits.va.gov','_blank')"><span class="nav-icon">🔗</span> eBenefits</div>
@@ -544,6 +703,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ACTIVITY LOG -->
+      <div class="page" id="page-activity">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Activity Log</div><div class="pg-sub">Every action tracked — with one-click undo</div></div>
+          <button class="btn btn-outline" onclick="if(undoStack.length)undoLastAction()">↩ Undo Last</button>
+        </div>
+        <div id="activityContent"><div class="empty-state"><div style="font-size:32px;margin-bottom:10px">📋</div>No activity yet.</div></div>
       </div>
 
     </main>
