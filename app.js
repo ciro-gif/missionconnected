@@ -293,7 +293,7 @@ function renderMOSItems(container, data) {
   list.slice(0, 15).forEach(m => {
     const el = document.createElement('div');
     el.className = 'mos-item' + (ans.mos?.code === m.code ? ' selected' : '');
-    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.title}</div><div class="mos-tags">${(m.tags||[]).map(t=>`<span class="mos-tag tag-${t==='TERA'?'amber':'red'}">${t}</span>`).join('')}</div><div class="mos-check">✓</div>`;
+    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.label||m.title||''}</div><div class="mos-tags">${m.tera?'<span class="mos-tag tag-amber">TERA</span>':''}</div><div class="mos-check">✓</div>`;
     el.onclick = () => selectMOS(el, m);
     container.appendChild(el);
   });
@@ -311,7 +311,7 @@ function filterMOSList(q) {
   list.slice(0, 20).forEach(m => {
     const el = document.createElement('div');
     el.className = 'mos-item';
-    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.title}</div><div class="mos-check">✓</div>`;
+    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.label||m.title||''}</div><div class="mos-check">✓</div>`;
     el.onclick = () => selectMOS(el, m);
     container.appendChild(el);
   });
@@ -324,77 +324,32 @@ function selectMOS(el, m) {
   const intel = document.getElementById('mosIntel');
   if (!intel) return;
   intel.classList.add('show');
-  intel.innerHTML = `<div class="mos-intel-title">⚡ Intelligence Report: ${m.code} — ${m.title}</div>
+  intel.innerHTML = `<div class="mos-intel-title">⚡ Intelligence Report: ${m.code} — ${m.label||m.title||''}</div>
     <div>${(m.tags||[]).map(t=>`<span class="intel-tag intel-${t==='TERA'?'amber':'blue'}">${t}</span>`).join('')}</div>
-    <div class="mos-intel-body">${m.intel || 'This MOS has relevant service connection opportunities. Your roadmap will detail specific conditions associated with this specialty.'}</div>`;
+    <div class="mos-intel-body">${m.notes || m.intel || 'Your roadmap will detail specific conditions associated with this specialty.'}</div>`;
 }
 
-// ── SYMPTOM GRIDS ──
-const SYMPTOMS = [
-  {icon:'👂',lbl:'Tinnitus (ringing)',note:'Easy win'},
-  {icon:'🧠',lbl:'PTSD / Anxiety',note:'Common'},
-  {icon:'💔',lbl:'Depression',note:'Secondary'},
-  {icon:'😴',lbl:'Sleep problems',note:'Common'},
-  {icon:'🤕',lbl:'Headaches / Migraines',note:'Ratable'},
-  {icon:'🦵',lbl:'Knee pain',note:'High value'},
-  {icon:'🦷',lbl:'Back / Spine pain',note:'High value'},
-  {icon:'🫁',lbl:'Breathing issues',note:'PACT'},
-  {icon:'👁️',lbl:'Vision problems',note:'Ratable'},
-  {icon:'💊',lbl:'Chronic pain',note:'Ratable'},
-  {icon:'🤢',lbl:'GI issues',note:'Common'},
-  {icon:'🩺',lbl:'High blood pressure',note:'Secondary'},
-  {icon:'🍬',lbl:'Diabetes',note:'Presumptive'},
-  {icon:'🦴',lbl:'Shoulder pain',note:'Ratable'},
-  {icon:'🫀',lbl:'Heart issues',note:'Secondary'},
-  {icon:'🧬',lbl:'Skin conditions',note:'Ratable'},
-  {icon:'🏃',lbl:'Foot / ankle pain',note:'Ratable'},
-  {icon:'💆',lbl:'Memory / TBI',note:'High value'},
-];
-
-const DIAGNOSES = [
-  {icon:'📋',lbl:'PTSD'},
-  {icon:'🩺',lbl:'Hypertension'},
-  {icon:'🍬',lbl:'Type 2 Diabetes'},
-  {icon:'🫁',lbl:'Asthma / Breathing'},
-  {icon:'🦷',lbl:'Herniated disc'},
-  {icon:'🦵',lbl:'Knee injury / tear'},
-  {icon:'🦴',lbl:'Rotator cuff tear'},
-  {icon:'👂',lbl:'Hearing loss'},
-  {icon:'💔',lbl:'Depression / MDD'},
-  {icon:'😴',lbl:'Sleep apnea'},
-  {icon:'🧠',lbl:'TBI / Concussion'},
-  {icon:'🤢',lbl:'IBS / Crohn\'s'},
-  {icon:'🏃',lbl:'Plantar fasciitis'},
-  {icon:'🩻',lbl:'Arthritis'},
-  {icon:'🫀',lbl:'Heart disease'},
-  {icon:'🧬',lbl:'Skin condition'},
-];
-
-const RATED_CONDS = [
-  {icon:'📋',lbl:'PTSD'},{icon:'👂',lbl:'Tinnitus'},{icon:'🦵',lbl:'Knee condition'},
-  {icon:'🦷',lbl:'Back condition'},{icon:'🧠',lbl:'TBI'},{icon:'🩺',lbl:'Hypertension'},
-  {icon:'🍬',lbl:'Diabetes'},{icon:'😴',lbl:'Sleep apnea'},{icon:'🦴',lbl:'Shoulder'},
-  {icon:'👁️',lbl:'Vision'},{icon:'👂',lbl:'Hearing loss'},{icon:'💊',lbl:'Migraines'},
-];
+// ── SYMPTOM GRIDS ── (from data.js)
+// Use window.APP_SYMPTOMS, window.APP_DIAGNOSES, window.APP_RATED_CONDS
 
 function buildSymptomGrids() {
-  buildGrid('symptomGrid', SYMPTOMS, 'symptoms');
-  buildGrid('diagnosisGrid', DIAGNOSES, 'diagnoses');
+  buildGrid('symptomGrid', window.APP_SYMPTOMS || [], 'symptoms');
+  buildGrid('diagnosisGrid', window.APP_DIAGNOSES || [], 'diagnoses');
 }
 
 function buildRatedGrid() {
-  buildGrid('ratedCondGrid', RATED_CONDS, 'ratedConds');
+  buildGrid('ratedCondGrid', window.APP_RATED_CONDS || [], 'ratedConds');
 }
 
 function buildGrid(id, items, key) {
   const container = document.getElementById(id);
   if (!container) return;
-  container.innerHTML = items.map(item => `
-    <div class="sym-tile ${(ans[key]||[]).includes(item.lbl) ? 'selected' : ''}" onclick="toggleSymptom(this,'${item.lbl}','${key}')">
-      <div class="sym-icon">${item.icon}</div>
-      <div class="sym-lbl">${item.lbl}</div>
-      ${item.note ? `<div class="sym-note">${item.note}</div>` : ''}
-    </div>`).join('');
+  container.innerHTML = items.map(item => {
+    const lbl = item.label || item.lbl || '';
+    const sel = (ans[key]||[]).includes(lbl) ? 'selected' : '';
+    const note = item.note ? `<div class="sym-note">${item.note}</div>` : '';
+    return `<div class="sym-tile ${sel}" onclick="toggleSymptom(this,'${lbl}','${key}')"><div class="sym-icon">${item.icon}</div><div class="sym-lbl">${lbl}</div>${note}</div>`;
+  }).join('');
 }
 
 function toggleSymptom(el, val, key) {
