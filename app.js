@@ -5,7 +5,7 @@
 
 // ── SUPABASE ──
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzcGtndm9ka3lqaGNsem15Y2x1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjA1MDAwMDAwMH0.placeholder';
+const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
 const CLAUDE_KEY = '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';
 const CLAUDE_MODEL = 'claude-opus-4-5';
 
@@ -22,6 +22,8 @@ let conditions = [];
 let chatHistory = [];
 let uploadedFiles = [];
 let authMode = 'signin';
+let activityLog = [];
+let undoStack = [];
 
 // Screener answers
 const ans = {
@@ -111,6 +113,68 @@ function showPage(id) {
   showView('vApp');
   if (id === 'chat' && chatHistory.length === 0) initChat();
   if (id === 'regulations') buildRegsTree();
+  if (id === 'tracker') renderTrackerTable();
+  if (id === 'activity') renderActivityLog();
+}
+
+// ── ACTIVITY LOG ──
+function logActivity(type, description, undoFn = null) {
+  const entry = { id: Date.now(), type, description, timestamp: new Date(), undoFn };
+  activityLog.unshift(entry);
+  if (undoFn) undoStack.push(entry);
+  if (activityLog.length > 100) activityLog.pop();
+  updateActivityBadge();
+  if (currentPage === 'activity') renderActivityLog();
+}
+
+function updateActivityBadge() {
+  const badge = document.getElementById('activityBadge');
+  if (badge) badge.textContent = activityLog.length;
+}
+
+function renderActivityLog() {
+  const el = document.getElementById('activityContent');
+  if (!el) return;
+  if (!activityLog.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px;margin-bottom:10px">📋</div>No activity yet. Actions you take will appear here.</div>';
+    return;
+  }
+  const icons = { account_created:'🎉', signed_in:'🔐', roadmap_generated:'🗺️', condition_added:'➕', condition_advanced:'→', condition_edited:'✏️', check_toggled:'✅', chat_message:'💬', file_uploaded:'📁', file_removed:'🗑️', default:'⚡' };
+  el.innerHTML = `
+    <div class="activity-header">
+      <div class="activity-count">${activityLog.length} events</div>
+      ${undoStack.length ? `<button class="btn btn-outline btn-sm" onclick="undoLastAction()">↩ Undo Last Action</button>` : ''}
+    </div>
+    <div class="activity-timeline">
+      ${activityLog.map(e => {
+        const icon = icons[e.type] || icons.default;
+        const time = e.timestamp.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        const date = e.timestamp.toLocaleDateString([], {month:'short',day:'numeric'});
+        return `<div class="activity-item">
+          <div class="activity-icon">${icon}</div>
+          <div class="activity-body">
+            <div class="activity-desc">${e.description}</div>
+            <div class="activity-time">${date} · ${time}</div>
+          </div>
+          ${e.undoFn ? `<button class="btn-undo" onclick="undoSpecific(${e.id})">Undo</button>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function undoLastAction() {
+  const last = undoStack.pop();
+  if (!last) return;
+  try { last.undoFn(); logActivity('undo', `↩ Undid: ${last.description}`); }
+  catch(e) { console.warn('Undo failed:', e); }
+}
+
+function undoSpecific(id) {
+  const idx = undoStack.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  const entry = undoStack.splice(idx, 1)[0];
+  try { entry.undoFn(); logActivity('undo', `↩ Undid: ${entry.description}`); }
+  catch(e) { console.warn('Undo failed:', e); }
 }
 
 function requireAuth(fn) {
@@ -139,6 +203,15 @@ function switchAuthTab(mode) {
   document.getElementById('authModalSub').textContent = mode === 'signin'
     ? 'Sign in to access your saved roadmap and case history.'
     : 'Free forever. Save your roadmap, chat with Aylene, track your case.';
+  const isSignup = mode === 'signup';
+  const signupFields = document.getElementById('signupFields');
+  const confirmPwField = document.getElementById('confirmPwField');
+  const privacyRow = document.getElementById('authPrivacyRow');
+  const dismissRow = document.getElementById('authDismissRow');
+  if (signupFields) signupFields.style.display = isSignup ? 'block' : 'none';
+  if (confirmPwField) confirmPwField.style.display = isSignup ? 'block' : 'none';
+  if (privacyRow) privacyRow.style.display = isSignup ? 'block' : 'none';
+  if (dismissRow) dismissRow.style.display = isSignup ? 'none' : 'block';
   clearAuthError();
 }
 
@@ -163,12 +236,24 @@ async function handleAuthSubmit() {
   try {
     let result;
     if (authMode === 'signup') {
-      result = await sbClient.auth.signUp({ email, password });
+      const confirmPw = document.getElementById('authPasswordConfirm')?.value;
+      if (confirmPw !== undefined && confirmPw !== password) {
+        showAuthError('Passwords do not match.'); btn.disabled=false; btn.textContent='Create Free Account'; return;
+      }
+      const fullName = document.getElementById('authFullName')?.value?.trim() || '';
+      const phone = document.getElementById('authPhone')?.value?.trim() || '';
+      const state = document.getElementById('authState')?.value || '';
+      const birthMonth = document.getElementById('authBirthMonth')?.value || '';
+      const birthYear = document.getElementById('authBirthYear')?.value || '';
+      const privacy = document.getElementById('authPrivacy')?.checked;
+      if (!privacy) { showAuthError('Please accept the Privacy Policy to continue.'); btn.disabled=false; btn.textContent='Create Free Account'; return; }
+      result = await sbClient.auth.signUp({ email, password, options: { data: { full_name: fullName, phone, state, birth_month: birthMonth, birth_year: birthYear } } });
       if (result.error) throw result.error;
       if (result.data?.user) {
-        await sbClient.from('profiles').upsert({ id: result.data.user.id, screener_data: ans });
+        await sbClient.from('profiles').upsert({ id: result.data.user.id, screener_data: ans, full_name: fullName, phone, state, birth_month: birthMonth, birth_year: birthYear });
         setUser(result.data.user);
         closeAuth();
+        logActivity('account_created', '🎉 Account created — welcome to Mission: Connected');
         if (roadmapData) saveRoadmapToSupabase();
       } else {
         showAuthError('Check your email to confirm your account.');
@@ -178,6 +263,7 @@ async function handleAuthSubmit() {
       if (result.error) throw result.error;
       setUser(result.data.user);
       closeAuth();
+      logActivity('signed_in', '🔐 Signed in');
     }
   } catch(e) {
     showAuthError(e.message || 'Authentication failed. Please try again.');
@@ -480,6 +566,7 @@ Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific t
     })) || [];
 
     if (currentUser) await saveRoadmapToSupabase();
+    logActivity('roadmap_generated', `🗺️ Roadmap generated — ${roadmapData.conditions?.length || 0} conditions identified`);
     showView('vApp');
     showPage('roadmap');
     renderRoadmap(roadmapData);
@@ -721,7 +808,14 @@ function advanceCondition(condId) {
   if (!c) return;
   const flow = ['todo','inprog','filed','won'];
   const idx = flow.indexOf(c.col);
-  if (idx < flow.length - 1) c.col = flow[idx + 1];
+  if (idx < flow.length - 1) {
+    const prevCol = c.col;
+    c.col = flow[idx + 1];
+    const colLabels = {todo:'To Do',inprog:'In Progress',filed:'Filed',won:'Won'};
+    logActivity('condition_advanced', `→ ${c.name} moved to ${colLabels[c.col]}`, () => {
+      c.col = prevCol; renderDashboard();
+    });
+  }
   renderDashboard();
   saveConditions();
 }
@@ -750,19 +844,25 @@ function openAddModal() {
 }
 
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
+function showPrivacyPolicy() { document.getElementById('privacyModal')?.classList.add('active'); }
 
 function addCondition() {
   const name = document.getElementById('addCondName').value.trim();
   if (!name) { alert('Please enter a condition name.'); return; }
   const type = document.getElementById('addCondBasis').value;
   const status = document.getElementById('addCondStatus').value;
-  conditions.push({
+  const newCond = {
     id: 'local-' + Date.now(), name, type, col: status,
     checks: [
       {text:'Get current diagnosis from doctor',done:false},
       {text:'Gather supporting evidence',done:false},
       {text:'Write personal statement',done:false},
     ]
+  };
+  conditions.push(newCond);
+  logActivity('condition_added', `➕ Added condition: ${name}`, () => {
+    conditions = conditions.filter(c => c.id !== newCond.id);
+    renderDashboard(); renderTrackerTable();
   });
   closeModal('addModal');
   renderDashboard();
