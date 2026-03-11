@@ -498,3 +498,147 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .f-input:focus,.f-select:focus,.f-textarea:focus{outline:none;border-color:var(--sky);}
 .f-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .f-textarea{min-height:80px;resize:vertical;}
+
+/* ─────────────────────────────────────────────────────
+   HERO WITH BACKGROUND IMAGES
+───────────────────────────────────────────────────── */
+.l-hero{position:relative;overflow:hidden;}
+.l-hero-bg{position:absolute;top:0;right:0;bottom:0;width:55%;display:flex;gap:8px;padding:8px;pointer-events:none;}
+.l-hero-img{flex:1;object-fit:cover;border-radius:8px;opacity:.18;filter:grayscale(30%);}
+.l-hero-img-1{flex:1.2;}
+.l-hero-img-2{flex:1;margin-top:32px;}
+.l-hero-img-3{flex:.8;margin-top:64px;}
+.l-hero::after{content:'';position:absolute;top:0;right:0;bottom:0;width:55%;background:linear-gradient(90deg,var(--navy) 0%,transparent 40%);}
+.l-hero-inner{position:relative;z-index:2;}
+
+/* ─────────────────────────────────────────────────────
+   DASHBOARD PREVIEW SNAPSHOT
+───────────────────────────────────────────────────── */
+.l-preview-section{background:var(--off-white);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.l-preview-wrap{margin-top:40px;border-radius:12px;overflow:hidden;border:1px solid var(--border);box-shadow:var(--sh-lg);position:relative;background:white;}
+.preview-topbar{background:var(--navy);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:white;}
+.preview-logo{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;letter-spacing:.5px;}
+.preview-badge{background:var(--gold);color:var(--navy);font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;}
+.preview-tb-right{font-size:12px;color:rgba(255,255,255,.7);}
+.preview-ai-dot{display:inline-block;width:7px;height:7px;background:#4ade80;border-radius:50%;margin-right:4px;}
+.preview-layout{display:flex;height:340px;}
+.preview-sidebar{width:160px;background:#001f47;padding:14px 0;flex-shrink:0;}
+.preview-nav-item{padding:9px 16px;font-size:12px;color:rgba(255,255,255,.55);cursor:default;display:flex;align-items:center;gap:8px;}
+.preview-nav-item.active{background:rgba(255,255,255,.1);color:white;border-left:3px solid var(--gold);}
+.preview-content{flex:1;padding:20px;overflow:hidden;background:var(--gray-50);}
+.preview-hero-banner{background:linear-gradient(135deg,var(--navy),var(--blue));border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.preview-hero-title{font-family:var(--font-display);font-size:16px;font-weight:700;color:white;}
+.preview-hero-sub{font-size:11px;color:rgba(255,255,255,.65);margin-top:3px;}
+.preview-rating-chip{background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.5);color:var(--gold-mid);font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;}
+.preview-cond-list{display:flex;flex-direction:column;gap:8px;}
+.preview-cond-card{background:white;border:1px solid var(--border);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;border-left:3px solid var(--border);}
+.preview-cond-card.border-direct{border-left-color:var(--navy);}
+.preview-cond-card.border-secondary{border-left-color:var(--sky);}
+.preview-cond-card.border-presumptive{border-left-color:var(--purple);}
+.preview-cond-name{font-size:13px;font-weight:600;color:var(--text);min-width:140px;}
+.preview-badge-type{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;}
+.preview-badge-type.direct{background:#dbeafe;color:var(--navy);}
+.preview-badge-type.secondary{background:#e0f2fe;color:var(--sky);}
+.preview-badge-type.presumptive{background:#ede9fe;color:var(--purple);}
+.preview-prio{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.5px;}
+.preview-prio.high{background:#fef2f2;color:var(--red);}
+.preview-prio.medium{background:#fffbeb;color:var(--amber);}
+.preview-cond-action{font-size:11px;color:var(--text-sec);margin-left:auto;}
+.preview-blur-overlay{position:absolute;bottom:0;left:0;right:0;height:160px;background:linear-gradient(transparent,rgba(0,0,0,.85));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;}
+
+/* ─────────────────────────────────────────────────────
+   AUTH MODAL ENHANCEMENTS
+───────────────────────────────────────────────────── */
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);overflow-y:auto;padding:20px;}
+.auth-overlay.active{display:flex;}
+.auth-modal{background:white;border-radius:12px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;max-height:90vh;overflow-y:auto;}
+.auth-close-btn{position:absolute;top:14px;right:14px;background:none;border:none;font-size:18px;color:var(--text-hint);cursor:pointer;z-index:1;padding:4px 8px;border-radius:4px;}
+.auth-close-btn:hover{background:var(--gray-100);color:var(--text);}
+.auth-field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.auth-privacy{margin:12px 0;padding:12px;background:var(--sky-pale);border:1px solid #bfdbfe;border-radius:6px;}
+.auth-privacy-label{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--text-sec);line-height:1.5;cursor:pointer;}
+.auth-privacy-label input{margin-top:2px;flex-shrink:0;accent-color:var(--blue);}
+.auth-privacy-label a{color:var(--blue);text-decoration:underline;}
+
+/* ─────────────────────────────────────────────────────
+   ACTIVITY LOG
+───────────────────────────────────────────────────── */
+.activity-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.activity-count{font-size:13px;font-weight:600;color:var(--text-sec);}
+.activity-timeline{display:flex;flex-direction:column;gap:0;}
+.activity-item{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);position:relative;}
+.activity-item:last-child{border-bottom:none;}
+.activity-icon{width:32px;height:32px;background:var(--gray-100);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px;}
+.activity-body{flex:1;}
+.activity-desc{font-size:14px;font-weight:500;color:var(--text);}
+.activity-time{font-size:12px;color:var(--text-hint);margin-top:2px;}
+.btn-undo{font-size:11px;font-weight:600;color:var(--blue);background:var(--sky-pale);border:1px solid #bfdbfe;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;margin-top:2px;}
+.btn-undo:hover{background:#dbeafe;}
+.nav-badge{background:var(--sky);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto;}
+
+/* ─────────────────────────────────────────────────────
+   NETLIFY/GITHUB INSPIRED DASHBOARD AESTHETIC
+───────────────────────────────────────────────────── */
+/* Cleaner card headers */
+.card{border:1px solid var(--border);border-radius:8px;background:white;overflow:hidden;box-shadow:none;}
+.card-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--gray-50);}
+.card-title{font-size:13px;font-weight:600;color:var(--text);}
+.card-body{padding:18px;}
+
+/* GitHub-style status dots */
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.status-dot.green{background:#22c55e;}
+.status-dot.amber{background:#f59e0b;}
+.status-dot.blue{background:#3b82f6;}
+.status-dot.gray{background:#9ca3af;}
+
+/* Kanban — cleaner GitHub-style */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;min-height:320px;}
+.kanban-col{background:var(--gray-50);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.kanban-col-hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.kanban-col-title{font-size:12px;font-weight:700;color:var(--text-sec);letter-spacing:.3px;text-transform:uppercase;}
+.kanban-col-count{background:var(--gray-200);color:var(--gray-600);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;}
+.kcard{background:white;border:1px solid var(--border);border-radius:6px;padding:12px;transition:box-shadow .15s;}
+.kcard:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.kcard-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.kcard-basis{font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;letter-spacing:.4px;}
+.kcard-progress{height:3px;background:var(--gray-200);border-radius:2px;margin:8px 0 4px;overflow:hidden;}
+.kcard-prog-fill{height:100%;border-radius:2px;transition:width .3s;}
+.kcard-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--text-hint);margin-bottom:6px;}
+.kcard-checks{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+.check-item{display:flex;align-items:flex-start;gap:6px;font-size:11px;color:var(--text-sec);cursor:pointer;padding:2px 0;}
+.check-item.checked .check-text{text-decoration:line-through;color:var(--text-hint);}
+.check-box{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;background:white;color:var(--green);}
+.check-item.checked .check-box{background:var(--green-light);border-color:var(--green);}
+.kbtn-advance{width:100%;padding:5px;font-size:11px;font-weight:600;background:var(--sky-pale);color:var(--blue);border:1px solid #bfdbfe;border-radius:4px;cursor:pointer;transition:.15s;}
+.kbtn-advance:hover{background:#dbeafe;}
+
+/* Gauge section — tighter layout */
+.gauge-section{display:grid;grid-template-columns:220px 1fr;gap:16px;margin-bottom:20px;}
+.gauge-card{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center;}
+.gauge-title{font-size:12px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.gauge-wrap{position:relative;width:160px;margin:0 auto;}
+.gauge-svg{width:100%;display:block;}
+.gauge-center-val{position:absolute;bottom:0;left:0;right:0;text-align:center;}
+.gauge-pct{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--navy);}
+.gauge-pct-label{font-size:10px;color:var(--text-hint);font-weight:600;letter-spacing:.5px;}
+.gauge-legend{display:flex;justify-content:center;gap:16px;margin-top:10px;}
+.gauge-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-sec);}
+.gauge-legend-dot{width:10px;height:10px;border-radius:50%;}
+.service-profile{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;}
+.sp-title{font-size:12px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.sp-item{padding:10px 12px;background:var(--gray-50);border:1px solid var(--border);border-radius:6px;}
+.sp-item-label{font-size:10px;font-weight:600;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.sp-item-val{font-size:13px;font-weight:500;color:var(--text);}
+.sp-item-val.empty{color:var(--text-hint);font-style:italic;}
+
+/* Dash hero — GitHub project page style */
+.dash-hero{background:var(--navy);border-radius:8px;padding:20px 24px;margin-bottom:20px;color:white;}
+.dash-hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+.dash-branch-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:6px;}
+.dash-vet-name{font-family:var(--font-display);font-size:22px;font-weight:700;color:white;}
+.dash-vet-meta{font-size:13px;color:rgba(255,255,255,.6);margin-top:3px;}
+.dash-stats-row{display:flex;gap:24px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);}
+.dash-stat-val{font-family:var(--font-display);font-size:24px;font-weight:700;color:white;}
+.dash-stat-lbl{font-size:11px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;}
