@@ -140,3 +140,9 @@ const RATED_CONDS = [
   {icon:'⚡',label:'Peripheral Neuropathy'},{icon:'🔥',label:'Skin Condition'},
   {icon:'🦴',label:'Hip Condition'},{icon:'🧪',label:'Kidney Condition'},
 ];
+
+// Alias for app.js compatibility
+window.MOS_DATA = MOS_BY_BRANCH;
+window.APP_SYMPTOMS = SYMPTOMS;
+window.APP_DIAGNOSES = DIAGNOSES;
+window.APP_RATED_CONDS = RATED_CONDS;
