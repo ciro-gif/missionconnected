@@ -1,1609 +1,1177 @@
-/* =======================================================
-   MISSION: CONNECTED v6 — APP.JS
-   Screener · Roadmap · Chat · Dashboard · Tracker
-   Records · Regulations · Utilities
-======================================================= */
+/* =====================================================
+   MISSION: CONNECTED — APP.JS v2
+   Supabase + Claude AI + Full Rebuild
+===================================================== */
 
-// ── CONFIG ──
-const API_KEY = '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';
+// ── SUPABASE ──
+const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzcGtndm9ka3lqaGNsem15Y2x1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjA1MDAwMDAwMH0.placeholder';
+const CLAUDE_KEY = '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';
+const CLAUDE_MODEL = 'claude-opus-4-5';
+
+let supabase = null;
+try { supabase = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('Supabase init failed'); }
 
 // ── STATE ──
-let ans = {
-  goal:'', branch:[], component:'', startYear:'', endYear:'', discharge:'',
-  mos:'', deployments:[], exposures:[], vaStatus:'',
-  ratedConditions:[], symptoms:[], diagnoses:[], events:[],
-  evidence:[], impact:[], followupQs:[], followupAs:{},
-  otherRated:'', otherDiag:''
+let currentUser = null;
+let currentView = 'vLanding';
+let currentPage = 'roadmap';
+let currentScreen = 1;
+let roadmapData = null;
+let conditions = [];
+let chatHistory = [];
+let uploadedFiles = [];
+let authMode = 'signin';
+
+// Screener answers
+const ans = {
+  goal:'', branch:[], component:'', startYear:'', endYear:'',
+  discharge:'', mos:{}, deployments:[], exposures:[],
+  vaStatus:'', ratedConds:[], symptoms:[], diagnoses:[],
+  events:[], evidence:[], impact:[], followups:{}
 };
 
-let claims = JSON.parse(localStorage.getItem('mc6_claims') || '[]');
+// ── 2025 VA PAY TABLES ──
+const VA_RATES = {
+  10:  { none:175.51, spouse:175.51, spouse_child:175.51, spouse_2c:175.51, child:175.51 },
+  20:  { none:346.95, spouse:346.95, spouse_child:346.95, spouse_2c:346.95, child:346.95 },
+  30:  { none:537.42, spouse:590.95, spouse_child:637.60, spouse_2c:684.25, child:576.25 },
+  40:  { none:774.16, spouse:847.87, spouse_child:906.93, spouse_2c:965.99, child:831.22 },
+  50:  { none:1102.04,spouse:1196.03,spouse_child:1268.74,spouse_2c:1341.45,child:1171.79 },
+  60:  { none:1395.93,spouse:1510.10,spouse_child:1596.26,spouse_2c:1682.42,child:1477.74 },
+  70:  { none:1759.19,spouse:1893.69,spouse_child:1993.36,spouse_2c:2093.03,child:1852.87 },
+  80:  { none:2044.89,spouse:2199.52,spouse_child:2312.63,spouse_2c:2425.74,child:2150.66 },
+  90:  { none:2297.96,spouse:2472.72,spouse_child:2599.28,spouse_2c:2725.84,child:2416.27 },
+  100: { none:3737.85,spouse:3946.25,spouse_child:4103.68,spouse_2c:4261.11,child:3870.43 }
+};
 
-function saveClaims() {
-  localStorage.setItem('mc6_claims', JSON.stringify(claims));
-}
-
-(function migrateLegacy() {
-  const old = localStorage.getItem('mc6_conds') || localStorage.getItem('mc6_dash');
-  if (old && !claims.length) {
-    try {
-      const parsed = JSON.parse(old);
-      if (Array.isArray(parsed) && parsed.length) {
-        claims = parsed.map(c => ({
-          id: c.id || Date.now() + Math.random(),
-          name: c.name || '',
-          rating: c.rating || 0,
-          status: c.status || c.col || 'todo',
-          type: c.type || inferCondType(c.name || ''),
-          col: c.col || statusToCol(c.status),
-          checks: c.checks || buildChecksFor(c.name || ''),
-          expanded: false,
-          code: c.code || '',
-          secondary: c.secondary || '',
-          notes: c.notes || ''
-        }));
-        saveClaims();
-      }
-    } catch(e) {}
-  }
-})();
-
-function statusToCol(status) {
-  if (status === 'connected') return 'won';
-  if (status === 'pending') return 'filed';
-  if (status === 'denied') return 'todo';
-  return 'todo';
-}
-
-let chatHistory = [];
-let screenHistory = [];
-let currentScreen = 1;
-const TOTAL_SCREENS = 15;
-let dlDocs = [], medDocs = [];
-let roadmapText = '';
-let currentReg = null;
-
-// =======================================================
-// VIEW MANAGEMENT
-// =======================================================
-function showView(id) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  window.scrollTo(0, 0);
-}
-
-function startScreener() {
-  ans = {goal:'',branch:[],component:'',startYear:'',endYear:'',discharge:'',mos:'',deployments:[],exposures:[],vaStatus:'',ratedConditions:[],symptoms:[],diagnoses:[],events:[],evidence:[],impact:[],followupQs:[],followupAs:{},otherRated:'',otherDiag:''};
-  screenHistory = []; currentScreen = 1;
-  showView('vScreener');
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', async () => {
+  buildYearSelects();
   buildSymptomGrids();
-  populateYearSelects();
-  renderScreen(1);
-}
+  buildRegsTree();
+  renderAyleneAvatar();
+  checkAuthState();
+});
 
-// FIX: retakeScreener and resetApiKey are now separate top-level functions
-function retakeScreener() {
-  if (confirm('Update your screening? Your roadmap will be rebuilt.')) startScreener();
-}
-
-function resetApiKey() {
-  localStorage.removeItem('mc6_apikey');
-  location.reload();
-}
-
-// =======================================================
-// SCREENER — SCREEN STACK NAVIGATION
-// =======================================================
-function getNextScreen(from) {
-  let next = from + 1;
-  if (next === 9 && ['never_filed','healthcare','understand'].includes(ans.vaStatus)) next = 10;
-  return next;
-}
-
-function nextScreen() {
-  if (currentScreen === 9)  ans.otherRated = document.getElementById('otherRatedInput')?.value || '';
-  if (currentScreen === 11) ans.otherDiag  = document.getElementById('otherDiagInput')?.value  || '';
-  if (currentScreen >= TOTAL_SCREENS) { launchLoading(); return; }
-  screenHistory.push(currentScreen);
-  currentScreen = getNextScreen(currentScreen);
-  renderScreen(currentScreen);
-  if (currentScreen === TOTAL_SCREENS) generateFollowupQuestions();
-}
-
-function skipScreen() {
-  screenHistory.push(currentScreen);
-  currentScreen = getNextScreen(currentScreen);
-  renderScreen(currentScreen);
-  if (currentScreen === TOTAL_SCREENS) generateFollowupQuestions();
-}
-
-function prevScreen() {
-  if (!screenHistory.length) return;
-  currentScreen = screenHistory.pop();
-  renderScreen(currentScreen);
-}
-
-function renderScreen(n) {
-  document.querySelectorAll('.s-screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('ss' + n)?.classList.add('active');
-  const pct = ((n - 1) / (TOTAL_SCREENS - 1)) * 100;
-  document.getElementById('sProgFill').style.width = pct + '%';
-  document.getElementById('sStepText').textContent = `Step ${n} of ${TOTAL_SCREENS}`;
-  document.getElementById('btnBack').disabled = screenHistory.length === 0;
-  document.getElementById('btnNext').textContent = n >= TOTAL_SCREENS ? 'Build My Roadmap →' : 'Continue →';
-  document.getElementById('btnSkip').style.display = [1, 2].includes(n) ? 'none' : 'inline';
-  if (n === 3) toggleReserveNotice();
-  if (n === 5) populateMOSList();
-}
-
-function toggleReserveNotice() {
-  const notice = document.getElementById('reserveNotice');
-  if (!notice) return;
-  notice.style.display = ['Reserve','National Guard'].includes(ans.component) ? 'block' : 'none';
-}
-
-// =======================================================
-// SELECTION HELPERS
-// =======================================================
-function pick(el, field) {
-  el.closest('.choice-grid').querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  ans[field] = el.dataset.val;
-}
-
-function pickMulti(el, field) {
-  if (!Array.isArray(ans[field])) ans[field] = [];
-  el.classList.toggle('selected');
-  const val = el.dataset.val;
-  if (el.classList.contains('selected')) { if (!ans[field].includes(val)) ans[field].push(val); }
-  else { ans[field] = ans[field].filter(v => v !== val); }
-}
-
-function pickTile(el, field) {
-  if (!Array.isArray(ans[field])) ans[field] = [];
-  el.classList.toggle('selected');
-  const val = el.dataset.val;
-  if (el.classList.contains('selected')) { if (!ans[field].includes(val)) ans[field].push(val); }
-  else { ans[field] = ans[field].filter(v => v !== val); }
-}
-
-function updateBranchDisplay() {}
-
-// =======================================================
-// MOS
-// =======================================================
-function populateMOSList() {
-  const branches = ans.branch.length ? ans.branch : ['Army'];
-  let allMOS = [];
-  branches.forEach(b => { (MOS_BY_BRANCH[b] || []).forEach(m => allMOS.push({...m, branch: b})); });
-  allMOS.sort((a, b) => a.code.localeCompare(b.code));
-  renderMOSList(allMOS);
-}
-
-function renderMOSList(list) {
-  const c = document.getElementById('mosBranchList');
-  c.innerHTML = '';
-  list.forEach(m => {
-    const div = document.createElement('div');
-    div.className = 'mos-item' + (ans.mos === m.code ? ' selected' : '');
-    div.dataset.code = m.code;
-    const multiBranch = ans.branch.length > 1;
-    div.innerHTML = `
-      <div class="mos-code">${m.code}</div>
-      <div class="mos-label">${m.label}${multiBranch ? ` <span style="font-size:10px;color:var(--text-hint);">(${m.branch})</span>` : ''}</div>
-      <div class="mos-tags">
-        ${m.tera ? '<span class="mos-tag tag-amber">TERA</span>' : ''}
-        ${['High','Very High'].includes(m.noise) ? '<span class="mos-tag tag-red">High Noise</span>' : ''}
-      </div>
-      <div class="mos-check">✓</div>`;
-    div.onclick = () => selectMOS(m);
-    c.appendChild(div);
+async function checkAuthState() {
+  if (!supabase) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) setUser(session.user);
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.user) setUser(session.user);
+    else { currentUser = null; updateTopbar(); }
   });
 }
 
-function filterMOSList(q) {
-  q = q.toLowerCase();
-  const branches = ans.branch.length ? ans.branch : ['Army'];
-  let all = [];
-  branches.forEach(b => { (MOS_BY_BRANCH[b] || []).forEach(m => all.push({...m, branch: b})); });
-  all.sort((a, b) => a.code.localeCompare(b.code));
-  renderMOSList(q ? all.filter(m => m.code.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)) : all);
+function setUser(user) {
+  currentUser = user;
+  updateTopbar();
+  loadUserData();
 }
 
-function selectMOS(m) {
-  ans.mos = m.code;
-  document.querySelectorAll('.mos-item').forEach(el => el.classList.toggle('selected', el.dataset.code === m.code));
-  const box = document.getElementById('mosIntel');
-  box.innerHTML = `
-    <div class="mos-intel-title">🎯 MOS Intelligence: ${m.code} — ${m.label}</div>
-    <div style="margin-bottom:8px;">
-      ${m.tera ? '<span class="intel-tag intel-amber">⚠️ TERA RECOGNIZED</span>' : ''}
-      <span class="intel-tag intel-blue">🔊 Noise: ${m.noise}</span>
-    </div>
-    <div class="mos-intel-body">${m.notes}</div>`;
-  box.classList.add('show');
+function updateTopbar() {
+  const area = document.getElementById('tbUserArea');
+  if (!area) return;
+  if (currentUser) {
+    const email = currentUser.email || '';
+    const initial = email[0]?.toUpperCase() || 'V';
+    area.innerHTML = `<div class="a-tb-user"><div class="a-tb-avatar-sm">${initial}</div><span class="a-tb-user-email">${email}</span><button class="btn-tb-out" onclick="signOut()">Sign Out</button></div>`;
+  } else {
+    area.innerHTML = `<button class="btn-tb-signup" onclick="openAuth('signup')">Save My Roadmap →</button>`;
+  }
 }
 
-// =======================================================
-// SYMPTOM GRIDS
-// =======================================================
-function buildSymptomGrids() {
-  const sg = document.getElementById('symptomGrid');
-  if (sg) sg.innerHTML = SYMPTOMS.map(s => `
-    <div class="sym-tile" data-val="${s.label}" onclick="pickTile(this,'symptoms')">
-      <div class="sym-icon">${s.icon}</div>
-      <div class="sym-lbl">${s.label}</div>
-      ${s.note ? `<div class="sym-note">${s.note}</div>` : ''}
-    </div>`).join('');
-  const dg = document.getElementById('diagnosisGrid');
-  if (dg) dg.innerHTML = DIAGNOSES.map(d => `
-    <div class="sym-tile" data-val="${d.label}" onclick="pickTile(this,'diagnoses')">
-      <div class="sym-icon">${d.icon}</div><div class="sym-lbl">${d.label}</div>
-    </div>`).join('');
-  const rg = document.getElementById('ratedCondGrid');
-  if (rg) rg.innerHTML = RATED_CONDS.map(r => `
-    <div class="sym-tile" data-val="${r.label}" onclick="pickTile(this,'ratedConditions')">
-      <div class="sym-icon">${r.icon}</div><div class="sym-lbl">${r.label}</div>
-    </div>`).join('');
+async function loadUserData() {
+  if (!supabase || !currentUser) return;
+  try {
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (profile?.screener_data) Object.assign(ans, profile.screener_data);
+    if (profile?.roadmap_text) { roadmapData = profile.roadmap_text; }
+    const { data: claims } = await supabase.from('claims').select('*').eq('user_id', currentUser.id);
+    if (claims?.length) { conditions = claims; }
+    if (roadmapData) renderRoadmap(roadmapData);
+    if (conditions.length) renderDashboard();
+  } catch(e) { console.warn('Load error:', e); }
 }
 
-function populateYearSelects() {
+// ── VIEW ROUTING ──
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  currentView = id;
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id)?.classList.add('active');
+  document.getElementById('nav-'+id)?.classList.add('active');
+  currentPage = id;
+  showView('vApp');
+  if (id === 'chat' && chatHistory.length === 0) initChat();
+  if (id === 'regulations') buildRegsTree();
+}
+
+function requireAuth(fn) {
+  if (currentUser) { fn(); return; }
+  openAuth('signup');
+}
+
+// ── AUTH ──
+function openAuth(mode = 'signin') {
+  authMode = mode;
+  switchAuthTab(mode);
+  document.getElementById('authOverlay').classList.add('active');
+  setTimeout(() => document.getElementById('authEmail')?.focus(), 100);
+}
+
+function closeAuth() {
+  document.getElementById('authOverlay').classList.remove('active');
+}
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabSignin').classList.toggle('active', mode === 'signin');
+  document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+  document.getElementById('authSubmitBtn').textContent = mode === 'signin' ? 'Sign In' : 'Create Free Account';
+  document.getElementById('authModalTitle').textContent = mode === 'signin' ? 'Welcome Back' : 'Create Your Free Account';
+  document.getElementById('authModalSub').textContent = mode === 'signin'
+    ? 'Sign in to access your saved roadmap and case history.'
+    : 'Free forever. Save your roadmap, chat with Aylene, track your case.';
+  clearAuthError();
+}
+
+function clearAuthError() {
+  const el = document.getElementById('authError');
+  el.textContent = ''; el.classList.remove('show');
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.classList.add('show');
+}
+
+async function handleAuthSubmit() {
+  if (!supabase) { showAuthError('Authentication service not available.'); return; }
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { showAuthError('Please enter your email and password.'); return; }
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Please wait...';
+  clearAuthError();
+  try {
+    let result;
+    if (authMode === 'signup') {
+      result = await supabase.auth.signUp({ email, password });
+      if (result.error) throw result.error;
+      if (result.data?.user) {
+        await supabase.from('profiles').upsert({ id: result.data.user.id, screener_data: ans });
+        setUser(result.data.user);
+        closeAuth();
+        if (roadmapData) saveRoadmapToSupabase();
+      } else {
+        showAuthError('Check your email to confirm your account.');
+      }
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
+      if (result.error) throw result.error;
+      setUser(result.data.user);
+      closeAuth();
+    }
+  } catch(e) {
+    showAuthError(e.message || 'Authentication failed. Please try again.');
+  }
+  btn.disabled = false;
+  btn.textContent = authMode === 'signin' ? 'Sign In' : 'Create Free Account';
+}
+
+async function signOut() {
+  if (supabase) await supabase.auth.signOut();
+  currentUser = null; roadmapData = null; conditions = []; chatHistory = [];
+  updateTopbar();
+  showView('vLanding');
+}
+
+async function saveRoadmapToSupabase() {
+  if (!supabase || !currentUser || !roadmapData) return;
+  try {
+    await supabase.from('profiles').upsert({
+      id: currentUser.id, screener_data: ans, roadmap_text: roadmapData
+    });
+  } catch(e) { console.warn('Save error:', e); }
+}
+
+// ── CALC ──
+function updateCalc() {
+  const rating = parseInt(document.getElementById('calcRating').value);
+  const deps = document.getElementById('calcDeps').value;
+  const amountEl = document.getElementById('calcAmount');
+  const annualEl = document.getElementById('calcAnnual');
+  if (!rating || !VA_RATES[rating]) {
+    amountEl.textContent = 'Select a rating';
+    annualEl.textContent = '';
+    return;
+  }
+  const monthly = VA_RATES[rating][deps] || VA_RATES[rating]['none'];
+  const annual = (monthly * 12).toFixed(0);
+  amountEl.textContent = '$' + monthly.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  annualEl.textContent = '$' + parseInt(annual).toLocaleString() + '/year';
+}
+
+// ── SCREENER ──
+function startScreener() { currentScreen = 1; showView('vScreener'); goToScreen(1); }
+
+function buildYearSelects() {
   const sy = document.getElementById('profStartYear');
   const ey = document.getElementById('profEndYear');
   if (!sy || !ey) return;
-  for (let y = 2025; y >= 1960; y--) {
+  const now = new Date().getFullYear();
+  for (let y = now; y >= 1950; y--) {
     sy.innerHTML += `<option value="${y}">${y}</option>`;
     ey.innerHTML += `<option value="${y}">${y}</option>`;
   }
 }
 
-// =======================================================
-// AI FOLLOW-UP QUESTIONS
-// =======================================================
-async function generateFollowupQuestions() {
-  const c = document.getElementById('followupContainer');
-  try {
-    const prompt = `A veteran completed a VA disability screener. Generate EXACTLY 3 targeted follow-up questions to fill critical gaps.
-
-VETERAN DATA:\n${buildAnswerContext()}
-
-Rules:
-- 3-5 short clickable options per question
-- Focus on most important missing information for THEIR situation
-- Return ONLY valid JSON, no markdown:
-{"questions":[{"id":"q1","text":"Question?","options":["A","B","C"]},{"id":"q2","text":"Question?","options":["A","B"]},{"id":"q3","text":"Question?","options":["A","B","C"]}]}`;
-
-    const resp = await callClaude([{role:'user',content:prompt}], 'Return ONLY valid JSON. No markdown. No extra text.', 600);
-    let parsed;
-    try { parsed = JSON.parse(resp.replace(/```json|```/g, '').trim()); }
-    catch(e) {
-      parsed = {questions:[
-        {id:'q1',text:'Do you have a doctor you currently see for any of your symptoms?',options:['Yes — VA doctor','Yes — private doctor','No treatment yet','Have records already']},
-        {id:'q2',text:'Do you have your DD-214?',options:['Yes, I have it','No, need to request it','Not sure where it is']},
-        {id:'q3',text:'How soon are you looking to file?',options:['As soon as possible','After gathering evidence','Just exploring']}
-      ]};
-    }
-    ans.followupQs = parsed.questions;
-    c.innerHTML = parsed.questions.map(q => `
-      <div style="margin-bottom:20px;">
-        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;">${q.text}</div>
-        <div class="choice-grid cols-2">
-          ${q.options.map(opt => `
-            <div class="choice-card" data-qid="${q.id}" data-val="${opt}" onclick="pickFollowup(this,'${q.id}')">
-              <div style="flex:1;font-size:14px;font-weight:500;">${opt}</div>
-              <div class="choice-check">✓</div>
-            </div>`).join('')}
-        </div>
-      </div>`).join('');
-  } catch(e) {
-    c.innerHTML = `<div class="alert alert-amber"><span>⚠️</span><span>Follow-up questions unavailable. Continue to build your roadmap.</span></div>`;
-  }
+function goToScreen(n) {
+  currentScreen = n;
+  document.querySelectorAll('.s-screen').forEach(s => s.classList.remove('active'));
+  const screen = document.getElementById('ss' + n);
+  if (screen) screen.classList.add('active');
+  const total = 15;
+  const pct = Math.round(((n - 1) / total) * 100);
+  document.getElementById('sProgFill').style.width = pct + '%';
+  document.getElementById('sStepText').textContent = n <= total ? `Step ${n} of ${total}` : 'Finalizing...';
+  document.getElementById('btnBack').disabled = n <= 1;
+  document.getElementById('btnNext').textContent = n >= total ? 'Build My Roadmap →' : 'Continue →';
+  const sNav = document.getElementById('sNav');
+  if (n === 16) { sNav.style.display = 'none'; } else { sNav.style.display = 'flex'; }
+  // load dynamic content
+  if (n === 5) buildMOSList();
+  if (n === 9) buildRatedGrid();
+  if (n === 10) buildSymptomGrids();
+  if (n === 15) loadFollowups();
 }
 
-function pickFollowup(el, qid) {
+function nextScreen() {
+  if (currentScreen >= 15) { buildRoadmap(); return; }
+  goToScreen(currentScreen + 1);
+}
+function prevScreen() { if (currentScreen > 1) goToScreen(currentScreen - 1); }
+function skipScreen() { nextScreen(); }
+
+function pick(el, key) {
   el.closest('.choice-grid').querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  ans.followupAs[qid] = el.dataset.val;
-}
-
-// =======================================================
-// LOADING → ROADMAP
-// =======================================================
-function launchLoading() {
-  currentScreen = 16;
-  document.querySelectorAll('.s-screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('ss16').classList.add('active');
-  document.getElementById('sNav').style.display = 'none';
-  document.getElementById('sProgFill').style.width = '100%';
-  document.getElementById('sStepText').textContent = 'Analyzing your case...';
-  const steps = document.querySelectorAll('.loading-step');
-  let i = 0;
-  const iv = setInterval(() => {
-    if (i > 0) steps[i-1].classList.replace('active', 'done');
-    if (i < steps.length) { steps[i].classList.add('active'); i++; }
-    else clearInterval(iv);
-  }, 700);
-  setTimeout(buildRoadmap, 4500);
-}
-
-// =======================================================
-// BUILD ROADMAP
-// =======================================================
-async function buildRoadmap() {
-  try {
-    const isReserve = ['Reserve','National Guard'].includes(ans.component);
-    const ctx = buildAnswerContext();
-    const mosData = getMOSData();
-    const reserveNote = isReserve
-      ? `RESERVIST/GUARD: STRs are sparse by design. Lead with civilian medical records + personal statements. LOD determinations required for drill injuries. Activation/deployment periods = same rules as active duty.`
-      : '';
-
-    const p1 = `VA disability claim strategist. Build a tight, scannable roadmap.
-${reserveNote}
-
-VETERAN: ${ctx}
-MOS INTEL: ${JSON.stringify(mosData)}
-
-For each claimable condition, output EXACTLY:
-
-**[CONDITION]** | [DIRECT/SECONDARY/PRESUMPTIVE/LAY TESTIMONY]
-- 🟢 Have: [what's working for them — 1 line]
-- 🔴 Need: [the one thing missing — 1 line]
-- 📋 Next action: [specific next step with form number]
-- ⚖️ Rating key: [10%: X] | [30%: X] | [50%+: X]
-
-Start with ## CLAIM OVERVIEW (2 sentences: overall strength + core strategy).
-Then ## CONDITIONS TO CLAIM — list every qualifying condition.
-End with ## YOU MAY NOT KNOW YOU CAN CLAIM — 2-3 overlooked conditions.
-
-Be direct. No filler. Each card should take 10 seconds to read.`;
-
-    const p2 = `Complete this veteran's roadmap. Be their advocate.
-${reserveNote}
-VETERAN: ${ctx}
-
-## YOUR NEXT 5 STEPS
-Number 1-5. Specific. Form numbers. No fluff.
-
-## ESTIMATED COMBINED RATING
-One line. Show the math.
-
-## YOUR STRONGEST LEGAL ADVANTAGE
-One paragraph. The single regulation or principle that helps them most.`;
-
-    const [resp1, resp2] = await Promise.all([
-      callClaude([{role:'user',content:p1}], buildSystemPrompt(), 2800),
-      callClaude([{role:'user',content:p2}], buildSystemPrompt(), 1600)
-    ]);
-
-    roadmapText = resp1 + '\n\n' + resp2;
-    autoPopulateConditions();
-    autoBuildDashboard();
-    showView('vApp');
-    updateSidebar();
-    showPage('roadmap');
-    renderRoadmap(roadmapText);
-    initChat();
-
-  } catch(e) {
-    showView('vApp');
-    updateSidebar();
-    showPage('roadmap');
-    document.getElementById('roadmapContent').innerHTML = `
-      <div class="alert alert-amber">
-        <span>⚠️</span>
-        <span><strong>API error.</strong> ${e.message}</span>
-      </div>
-      <div class="card" style="margin-top:14px;">
-        <div class="card-hdr"><div class="card-title">✅ Screening Complete</div></div>
-        <div style="font-size:13px;color:var(--text-sec);line-height:1.8;">${buildAnswerContext().replace(/\n/g,'<br>')}</div>
-      </div>`;
-    initChat();
+  ans[key] = el.dataset.val;
+  if (key === 'component') {
+    document.getElementById('reserveNotice').style.display =
+      (ans.component === 'Reserve' || ans.component === 'National Guard') ? 'flex' : 'none';
   }
 }
 
-function getMOSData() {
-  for (const branch of Object.keys(MOS_BY_BRANCH)) {
-    const found = MOS_BY_BRANCH[branch].find(m => m.code === ans.mos);
-    if (found) return found;
-  }
-  return {code: ans.mos||'Unknown', label:'Unknown MOS', noise:'Unknown', tera:false, notes:''};
+function pickMulti(el, key) {
+  el.classList.toggle('selected');
+  if (!ans[key]) ans[key] = [];
+  const val = el.dataset.val;
+  const idx = ans[key].indexOf(val);
+  if (idx >= 0) ans[key].splice(idx, 1);
+  else ans[key].push(val);
 }
 
-// =======================================================
-// RENDER ROADMAP
-// =======================================================
-function renderRoadmap(text) {
-  const isReserve = ['Reserve','National Guard'].includes(ans.component);
-  const goalLabels = {
-    first_time:'First-Time Disability Claim', increase:'Rating Increase Strategy',
-    secondary:'Secondary Conditions Plan', appeal:'Denial Appeal Roadmap',
-    healthcare:'VA Healthcare Access', understand:'Entitlement Assessment'
-  };
-
-  const hero = `
-    <div class="rm-hero no-print">
-      <div class="rm-hero-icon">🗺️</div>
-      <div>
-        <div class="rm-hero-lbl">Your Personalized Roadmap</div>
-        <div class="rm-hero-title">${goalLabels[ans.goal] || 'Claim Blueprint'}</div>
-        <div class="rm-hero-sub">${(ans.branch||[]).join('/')} · ${ans.mos||'MOS on file'} · ${ans.component||''} ${isReserve ? '· <span style="color:var(--gold);font-weight:600;">Reserve/Guard Rules Apply</span>' : ''}</div>
-      </div>
-    </div>`;
-
-  const reserveBanner = isReserve ? `
-    <div class="alert alert-amber" style="margin-bottom:14px;">
-      <span>⚠️</span>
-      <div><strong>Reserve / Guard Veteran — Evidence Strategy Adjusted</strong><br>
-      <span style="font-size:12px;">STRs are sparse by nature — your roadmap prioritizes <strong>civilian medical records, personal statements (VA 21-4138), and buddy statements</strong> as primary evidence.</span></div>
-    </div>` : '';
-
-  // FIX: removed the erroneous backslash before the backtick
-  const legend = `
-    <div class="type-legend">
-      <div class="legend-title">Connection Type Guide</div>
-      <div class="legend-items">
-        <div class="legend-item">
-          <span class="legend-dot" style="background:#1565c0;"></span>
-          <div><strong>Direct</strong> — condition caused directly by military service</div>
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot" style="background:#1976d2;"></span>
-          <div><strong>Secondary</strong> — caused or worsened by an already service-connected condition</div>
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot" style="background:#6a1b9a;"></span>
-          <div><strong>Presumptive</strong> — VA legally presumes service caused this (e.g. Agent Orange, burn pits, Gulf War)</div>
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot" style="background:#2e7d32;"></span>
-          <div><strong>Lay Testimony</strong> — your own credible statement is the primary evidence required</div>
-        </div>
-      </div>
-    </div>`;
-
-  const formatted = parseRoadmapToCards(text);
-
-  const actionBar = `
-    <div class="rm-action-bar no-print" id="roadmapActionBar">
-      <div>
-        <div class="rm-action-text">Does this roadmap look right to you?</div>
-        <span class="rm-action-sub">Confirm to activate your Kanban dashboard, or open the split view to discuss with the AI.</span>
-      </div>
-      <button class="btn btn-outline btn-red" onclick="openSplitChat()">💬 Questions / Concerns</button>
-      <button class="btn btn-gold" onclick="confirmRoadmap()">✅ Activate Dashboard</button>
-    </div>`;
-
-  document.getElementById('roadmapContent').innerHTML = hero + reserveBanner + legend + formatted + actionBar;
-  document.getElementById('roadmapSub').textContent = goalLabels[ans.goal] || 'Personalized Claim Blueprint';
+// ── MOS ──
+function buildMOSList() {
+  const container = document.getElementById('mosBranchList');
+  if (!container || !window.MOS_DATA) return;
+  renderMOSItems(container, window.MOS_DATA);
 }
 
-const LBORDER = {
-  'DIRECT':'lborder-direct',
-  'SECONDARY':'lborder-secondary',
-  'PRESUMPTIVE':'lborder-presumptive',
-  'LAY TESTIMONY':'lborder-lay'
-};
-const BADGE_CLASS = {
-  'DIRECT':'badge-direct',
-  'SECONDARY':'badge-secondary',
-  'PRESUMPTIVE':'badge-presumptive',
-  'LAY TESTIMONY':'badge-lay'
-};
-const TYPE_LABEL = {
-  'DIRECT':'Direct', 'SECONDARY':'Secondary',
-  'PRESUMPTIVE':'Presumptive', 'LAY TESTIMONY':'Lay Testimony'
-};
-
-function parseRoadmapToCards(text) {
-  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').map(l => l.trimStart());
-
-  let out = '';
-  let cardIdx = 0;
-  let inCard = false;
-  let cardName='', cardType='', have='', need='', action='', ratingKey='';
-  let pendingSectionBuf = '';
-
-  function flushSection() {
-    if (!pendingSectionBuf.trim()) return;
-    out += `<div style="font-size:13px;line-height:1.75;color:var(--text-sec);padding:4px 14px 10px;">${pendingSectionBuf}</div>`;
-    pendingSectionBuf = '';
-  }
-
-  function flushCard() {
-    if (!cardName) return;
-    flushSection();
-    const lbc = LBORDER[cardType] || 'lborder-direct';
-    const bc  = BADGE_CLASS[cardType] || 'badge-direct';
-    const tl  = TYPE_LABEL[cardType] || cardType;
-    const id  = 'cc' + cardIdx++;
-
-    let ratingHtml = '';
-    if (ratingKey) {
-      const parts = ratingKey.split('|').map(p => p.trim()).filter(Boolean);
-      ratingHtml = `<div class="rating-mini"><div class="rating-mini-hdr">VA Rating Criteria</div>${parts.map(p => {
-        const m = p.match(/^(\d+%):?\s*(.+)$/);
-        return m ? `<div class="rating-row"><div class="r-pct">${m[1]}</div><div class="r-desc">${m[2]}</div></div>` : '';
-      }).join('')}</div>`;
-    }
-
-    out += `
-      <div class="cond-card">
-        <div class="cond-card-hdr ${lbc}" onclick="toggleCard('${id}')">
-          <div style="flex:1;min-width:0;">
-            <div class="cond-name">${cardName}</div>
-            <div class="cond-meta"><span class="cond-pri-badge ${bc}">${tl}</span></div>
-            ${have ? `<div class="cond-preview" style="font-size:12px;color:var(--text-hint);margin-top:3px;">✅ ${have.substring(0,70)}${have.length>70?'...':''}</div>` : ''}
-          </div>
-          <div class="cond-toggle" id="tog-${id}">▾</div>
-        </div>
-        <div class="cond-body open" id="${id}">
-          <div class="ele-grid">
-            ${have   ? `<div class="ele-row ele-row-green"><div class="ele-label g">✅ Have</div><div class="ele-val">${have}</div></div>` : ''}
-            ${need   ? `<div class="ele-row ele-row-red"><div class="ele-label r">🔴 Need</div><div class="ele-val">${need}</div></div>` : ''}
-            ${action ? `<div class="ele-row ele-row-blue"><div class="ele-label b">📋 Action</div><div class="ele-val">${action}</div></div>` : ''}
-          </div>
-          ${ratingHtml}
-        </div>
-      </div>`;
-    cardName=''; cardType=''; have=''; need=''; action=''; ratingKey=''; inCard=false;
-  }
-
-  lines.forEach(line => {
-    const condMatch = line.match(/^\*{0,2}(.+?)\*{0,2}\s*\|\s*(DIRECT|SECONDARY|PRESUMPTIVE|LAY TESTIMONY)/i);
-    if (condMatch) {
-      const typeRaw = condMatch[2].toUpperCase();
-      if (['DIRECT','SECONDARY','PRESUMPTIVE','LAY TESTIMONY'].includes(typeRaw)) {
-        flushCard();
-        inCard = true;
-        cardName = condMatch[1].replace(/\*/g,'').trim();
-        cardType = typeRaw;
-        return;
-      }
-    }
-
-    if (inCard) {
-      const stripped = line.replace(/^[-•*]\s*/,'');
-      if (/Have:/i.test(line) && /🟢|✅|Have:/i.test(line))        { have      = line.replace(/.*(?:🟢|✅)?\s*Have:\s*/i,'').trim(); return; }
-      if (/Need:/i.test(line) && /🔴|Need:/i.test(line))            { need      = line.replace(/.*(?:🔴)?\s*Need:\s*/i,'').trim(); return; }
-      if (/Next action:|Action:/i.test(line))                        { action    = line.replace(/.*(?:📋)?\s*(?:Next action|Action):\s*/i,'').trim(); return; }
-      if (/Rating key:|Rating criteria:/i.test(line))                { ratingKey = line.replace(/.*(?:⚖[️]?)?\s*Rating (?:key|criteria):\s*/i,'').trim(); return; }
-      if (line.trim() === '') return;
-      if (/^[-•]/.test(line) && action) { action += ' · ' + stripped; return; }
-      if (/^[-•]/.test(line))           { action = stripped; return; }
-      return;
-    }
-
-    if (/^#{1,3}\s+/.test(line)) {
-      flushCard();
-      flushSection();
-      const title = line.replace(/^#{1,3}\s+/,'').replace(/\*\*(.+?)\*\*/g,'$1');
-      out += `<div class="rm-section-hdr">${title}</div>`;
-      return;
-    }
-
-    if (/^---+$/.test(line.trim())) return;
-
-    if (!inCard) pendingSectionBuf += fmtLine(line);
+function renderMOSItems(container, data) {
+  container.innerHTML = '';
+  const branch = ans.branch?.[0] || 'Army';
+  const list = data[branch] || data['Army'] || [];
+  list.slice(0, 15).forEach(m => {
+    const el = document.createElement('div');
+    el.className = 'mos-item' + (ans.mos?.code === m.code ? ' selected' : '');
+    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.title}</div><div class="mos-tags">${(m.tags||[]).map(t=>`<span class="mos-tag tag-${t==='TERA'?'amber':'red'}">${t}</span>`).join('')}</div><div class="mos-check">✓</div>`;
+    el.onclick = () => selectMOS(el, m);
+    container.appendChild(el);
   });
+}
 
-  flushCard();
-  flushSection();
+function filterMOSList(q) {
+  if (!window.MOS_DATA) return;
+  const branch = ans.branch?.[0] || 'Army';
+  const list = (window.MOS_DATA[branch] || []).filter(m =>
+    m.code.toLowerCase().includes(q.toLowerCase()) ||
+    m.title.toLowerCase().includes(q.toLowerCase())
+  );
+  const container = document.getElementById('mosBranchList');
+  container.innerHTML = '';
+  list.slice(0, 20).forEach(m => {
+    const el = document.createElement('div');
+    el.className = 'mos-item';
+    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.title}</div><div class="mos-check">✓</div>`;
+    el.onclick = () => selectMOS(el, m);
+    container.appendChild(el);
+  });
+}
 
-  if (!out.trim()) {
-    return `<div class="card" style="padding:20px;font-size:14px;line-height:1.8;">${fmt(text)}</div>`;
+function selectMOS(el, m) {
+  document.querySelectorAll('.mos-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+  ans.mos = m;
+  const intel = document.getElementById('mosIntel');
+  if (!intel) return;
+  intel.classList.add('show');
+  intel.innerHTML = `<div class="mos-intel-title">⚡ Intelligence Report: ${m.code} — ${m.title}</div>
+    <div>${(m.tags||[]).map(t=>`<span class="intel-tag intel-${t==='TERA'?'amber':'blue'}">${t}</span>`).join('')}</div>
+    <div class="mos-intel-body">${m.intel || 'This MOS has relevant service connection opportunities. Your roadmap will detail specific conditions associated with this specialty.'}</div>`;
+}
+
+// ── SYMPTOM GRIDS ──
+const SYMPTOMS = [
+  {icon:'👂',lbl:'Tinnitus (ringing)',note:'Easy win'},
+  {icon:'🧠',lbl:'PTSD / Anxiety',note:'Common'},
+  {icon:'💔',lbl:'Depression',note:'Secondary'},
+  {icon:'😴',lbl:'Sleep problems',note:'Common'},
+  {icon:'🤕',lbl:'Headaches / Migraines',note:'Ratable'},
+  {icon:'🦵',lbl:'Knee pain',note:'High value'},
+  {icon:'🦷',lbl:'Back / Spine pain',note:'High value'},
+  {icon:'🫁',lbl:'Breathing issues',note:'PACT'},
+  {icon:'👁️',lbl:'Vision problems',note:'Ratable'},
+  {icon:'💊',lbl:'Chronic pain',note:'Ratable'},
+  {icon:'🤢',lbl:'GI issues',note:'Common'},
+  {icon:'🩺',lbl:'High blood pressure',note:'Secondary'},
+  {icon:'🍬',lbl:'Diabetes',note:'Presumptive'},
+  {icon:'🦴',lbl:'Shoulder pain',note:'Ratable'},
+  {icon:'🫀',lbl:'Heart issues',note:'Secondary'},
+  {icon:'🧬',lbl:'Skin conditions',note:'Ratable'},
+  {icon:'🏃',lbl:'Foot / ankle pain',note:'Ratable'},
+  {icon:'💆',lbl:'Memory / TBI',note:'High value'},
+];
+
+const DIAGNOSES = [
+  {icon:'📋',lbl:'PTSD'},
+  {icon:'🩺',lbl:'Hypertension'},
+  {icon:'🍬',lbl:'Type 2 Diabetes'},
+  {icon:'🫁',lbl:'Asthma / Breathing'},
+  {icon:'🦷',lbl:'Herniated disc'},
+  {icon:'🦵',lbl:'Knee injury / tear'},
+  {icon:'🦴',lbl:'Rotator cuff tear'},
+  {icon:'👂',lbl:'Hearing loss'},
+  {icon:'💔',lbl:'Depression / MDD'},
+  {icon:'😴',lbl:'Sleep apnea'},
+  {icon:'🧠',lbl:'TBI / Concussion'},
+  {icon:'🤢',lbl:'IBS / Crohn\'s'},
+  {icon:'🏃',lbl:'Plantar fasciitis'},
+  {icon:'🩻',lbl:'Arthritis'},
+  {icon:'🫀',lbl:'Heart disease'},
+  {icon:'🧬',lbl:'Skin condition'},
+];
+
+const RATED_CONDS = [
+  {icon:'📋',lbl:'PTSD'},{icon:'👂',lbl:'Tinnitus'},{icon:'🦵',lbl:'Knee condition'},
+  {icon:'🦷',lbl:'Back condition'},{icon:'🧠',lbl:'TBI'},{icon:'🩺',lbl:'Hypertension'},
+  {icon:'🍬',lbl:'Diabetes'},{icon:'😴',lbl:'Sleep apnea'},{icon:'🦴',lbl:'Shoulder'},
+  {icon:'👁️',lbl:'Vision'},{icon:'👂',lbl:'Hearing loss'},{icon:'💊',lbl:'Migraines'},
+];
+
+function buildSymptomGrids() {
+  buildGrid('symptomGrid', SYMPTOMS, 'symptoms');
+  buildGrid('diagnosisGrid', DIAGNOSES, 'diagnoses');
+}
+
+function buildRatedGrid() {
+  buildGrid('ratedCondGrid', RATED_CONDS, 'ratedConds');
+}
+
+function buildGrid(id, items, key) {
+  const container = document.getElementById(id);
+  if (!container) return;
+  container.innerHTML = items.map(item => `
+    <div class="sym-tile ${(ans[key]||[]).includes(item.lbl) ? 'selected' : ''}" onclick="toggleSymptom(this,'${item.lbl}','${key}')">
+      <div class="sym-icon">${item.icon}</div>
+      <div class="sym-lbl">${item.lbl}</div>
+      ${item.note ? `<div class="sym-note">${item.note}</div>` : ''}
+    </div>`).join('');
+}
+
+function toggleSymptom(el, val, key) {
+  el.classList.toggle('selected');
+  if (!ans[key]) ans[key] = [];
+  const idx = ans[key].indexOf(val);
+  if (idx >= 0) ans[key].splice(idx, 1);
+  else ans[key].push(val);
+}
+
+// ── FOLLOW-UPS ──
+async function loadFollowups() {
+  const container = document.getElementById('followupContainer');
+  if (!container) return;
+  try {
+    const prompt = `Based on this veteran's screening:
+Branch: ${ans.branch?.join(', ')||'Unknown'}
+MOS: ${ans.mos?.code||'Unknown'} ${ans.mos?.title||''}
+Deployments: ${ans.deployments?.join(', ')||'None'}
+Exposures: ${ans.exposures?.join(', ')||'None'}
+Symptoms: ${ans.symptoms?.join(', ')||'None'}
+Events: ${ans.events?.join(', ')||'None'}
+
+Generate 3 short, specific follow-up questions that would strengthen their VA disability roadmap. Format as JSON array:
+[{"q":"question text","key":"unique_key","type":"yesno|text","placeholder":"optional"}]
+Return ONLY the JSON array, nothing else.`;
+
+    const data = await callClaude([{role:'user',content:prompt}], 300);
+    const text = data.content?.[0]?.text || '[]';
+    const clean = text.replace(/```json|```/g,'').trim();
+    const questions = JSON.parse(clean);
+
+    container.innerHTML = questions.map(q => `
+      <div style="margin-bottom:16px">
+        <div class="f-label">${q.q}</div>
+        ${q.type === 'yesno'
+          ? `<div class="choice-grid cols-2" style="margin-top:8px">
+               <div class="choice-card" data-val="Yes" onclick="pick(this,'followup_${q.key}');ans.followups['${q.key}']='Yes'"><div class="choice-label">Yes</div><div class="choice-check">✓</div></div>
+               <div class="choice-card" data-val="No" onclick="pick(this,'followup_${q.key}');ans.followups['${q.key}']='No'"><div class="choice-label">No</div><div class="choice-check">✓</div></div>
+             </div>`
+          : `<input class="s-input" style="margin-top:8px" placeholder="${q.placeholder||'Your answer...'}" oninput="ans.followups['${q.key}']=this.value">`
+        }
+      </div>`).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="alert alert-blue"><span>💡</span><span>Continue to build your roadmap. You can always ask Aylene specific questions later.</span></div>';
   }
-  return `<div id="condCards">${out}</div>`;
 }
 
-function fmtLine(line) {
-  line = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>');
-  if (line.match(/^\d+\.\s/)) return `<div style="display:flex;gap:10px;margin:7px 0;font-size:14px;"><span style="width:24px;height:24px;background:var(--blue);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px;">${line.match(/^(\d+)/)[1]}</span><span>${line.replace(/^\d+\.\s+/,'')}</span></div>`;
-  if (line.match(/^-\s/)) return `<div style="display:flex;gap:7px;margin:3px 0;font-size:14px;"><span style="color:var(--blue-mid);flex-shrink:0;margin-top:2px;">•</span><span>${line.replace(/^-\s+/,'')}</span></div>`;
-  if (line.trim() === '') return '<br>';
-  return `<p style="margin:4px 0;">${line}</p>`;
+// ── ROADMAP BUILDER ──
+async function buildRoadmap() {
+  goToScreen(16);
+  const loadingSteps = ['ls1','ls2','ls3','ls4','ls5','ls6'];
+  let step = 0;
+  const stepInterval = setInterval(() => {
+    if (step > 0) { document.getElementById(loadingSteps[step-1])?.classList.add('done'); document.getElementById(loadingSteps[step-1])?.classList.remove('active'); }
+    if (step < loadingSteps.length) { document.getElementById(loadingSteps[step])?.classList.add('active'); }
+    step++;
+    if (step > loadingSteps.length) clearInterval(stepInterval);
+  }, 1800);
+
+  const prompt = `You are a VA disability claims expert. Build a comprehensive claim roadmap for this veteran.
+
+VETERAN PROFILE:
+- Goal: ${ans.goal}
+- Branch: ${ans.branch?.join(', ')}
+- Component: ${ans.component}
+- Service Dates: ${ans.startYear||'?'}–${ans.endYear||'?'}
+- Discharge: ${ans.discharge}
+- MOS/Rate: ${ans.mos?.code||'?'} ${ans.mos?.title||''}
+- Deployments: ${ans.deployments?.join(', ')||'None listed'}
+- Toxic Exposures: ${ans.exposures?.join(', ')||'None listed'}
+- Current VA Status: ${ans.vaStatus}
+- Already Rated: ${ans.ratedConds?.join(', ')||'None'}
+- Reported Symptoms: ${ans.symptoms?.join(', ')||'None'}
+- Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
+- In-Service Events: ${ans.events?.join(', ')||'None'}
+- Evidence on Hand: ${ans.evidence?.join(', ')||'None'}
+- Life Impact: ${ans.impact?.join(', ')||'Not specified'}
+- Follow-up answers: ${JSON.stringify(ans.followups||{})}
+
+Generate a JSON roadmap in this exact format:
+{
+  "summary": "2-3 sentence personalized summary of this veteran's claim outlook",
+  "totalConditions": number,
+  "priority": "direct|secondary|presumptive",
+  "conditions": [
+    {
+      "name": "Condition name",
+      "type": "direct|secondary|presumptive|lay",
+      "priority": "high|medium|low",
+      "nexus": "Specific explanation of how this connects to service",
+      "evidence_have": "What they already have",
+      "evidence_need": "What they still need",
+      "action": "Specific next step",
+      "secondaryTo": "Condition name (only for secondary)",
+      "cfr": "38 CFR Part 4 diagnostic code if applicable",
+      "ratingCriteria": [
+        {"pct": 10, "desc": "Plain-language description of what 10% looks like"},
+        {"pct": 30, "desc": "..."},
+        {"pct": 50, "desc": "..."},
+        {"pct": 70, "desc": "...if applicable"}
+      ],
+      "checks": ["Action step 1", "Action step 2", "Action step 3"]
+    }
+  ],
+  "tdiu": boolean,
+  "tdiu_note": "explanation if tdiu applies",
+  "pact_note": "PACT Act note if relevant",
+  "top_action": "The single most important thing this veteran should do right now"
 }
 
-function toggleCard(id) {
-  const body = document.getElementById(id);
-  const tog  = document.getElementById('tog-' + id);
-  if (!body) return;
-  const open = body.classList.toggle('open');
-  if (tog) tog.textContent = open ? '▴' : '▾';
-}
-
-function confirmRoadmap() {
-  localStorage.setItem('mc6_roadmap_confirmed', '1');
-  if (!claims.length) autoPopulateConditions();
-  showPage('dashboard');
-  const notif = document.createElement('div');
-  notif.style.cssText = 'position:fixed;top:70px;right:20px;background:var(--green);color:white;padding:10px 18px;border-radius:var(--r);font-size:13px;font-weight:600;z-index:9999;box-shadow:var(--shadow-md);';
-  notif.textContent = '✅ Dashboard activated — tracking your case';
-  document.body.appendChild(notif);
-  setTimeout(() => notif.remove(), 3000);
-}
-
-// =======================================================
-// SPLIT-SCREEN CHAT
-// =======================================================
-let splitChatHistory = [];
-let splitChatOpen = false;
-
-function openSplitChat() {
-  if (splitChatOpen) return;
-  splitChatOpen = true;
-  const main = document.getElementById('page-roadmap');
-  const existing = main.querySelector('#roadmapContent');
-
-  const wrapper = document.createElement('div');
-  wrapper.id = 'splitWrapper';
-  wrapper.className = 'split-view';
-  wrapper.innerHTML = `
-    <div class="roadmap-panel" id="splitRoadmapPanel"></div>
-    <div class="chat-panel">
-      <div class="split-chat-wrap">
-        <div class="split-chat-top">
-          <div class="chat-av" style="width:30px;height:30px;font-size:11px;">A</div>
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--blue);">AI Advisor</div>
-            <div style="font-size:11px;color:var(--text-sec);">Ask about your roadmap</div>
-          </div>
-          <button class="btn-split-close" onclick="closeSplitChat()" style="margin-left:auto;">Close ✕</button>
-        </div>
-        <div class="split-chat-msgs" id="splitChatMsgs"></div>
-        <div class="split-chat-input">
-          <div class="split-chat-row">
-            <textarea class="split-chat-ta" id="splitChatInput" rows="1" placeholder="Ask about your roadmap..." onkeydown="handleSplitKey(event)" oninput="autoResize(this)"></textarea>
-            <button class="btn-send" onclick="sendSplitMessage()" id="splitSendBtn" style="width:34px;height:34px;font-size:15px;">↑</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-
-  const panel = wrapper.querySelector('#splitRoadmapPanel');
-  while (existing.firstChild) panel.appendChild(existing.firstChild);
-  existing.innerHTML = '';
-  existing.appendChild(wrapper);
-
-  const bar = document.getElementById('roadmapActionBar');
-  if (bar) bar.style.display = 'none';
-
-  splitChatHistory = [];
-  addSplitMsg('ai', `I can see your roadmap. What would you like to clarify or push back on?\n\nYou can ask about any specific condition, the evidence strategy, or whether the priorities look right for your situation.`);
-}
-
-function closeSplitChat() {
-  splitChatOpen = false;
-  const wrapper = document.getElementById('splitWrapper');
-  if (!wrapper) return;
-  const panel = wrapper.querySelector('#splitRoadmapPanel');
-  const content = document.getElementById('roadmapContent');
-  content.innerHTML = '';
-  while (panel.firstChild) content.appendChild(panel.firstChild);
-  const bar = document.getElementById('roadmapActionBar');
-  if (bar) bar.style.display = '';
-}
-
-function addSplitMsg(role, text) {
-  const msgs = document.getElementById('splitChatMsgs');
-  if (!msgs) return;
-  const div = document.createElement('div');
-  div.className = 'msg ' + role;
-  div.innerHTML = `<div class="msg-av ${role}" style="width:26px;height:26px;font-size:9px;">${role==='ai'?'A':'YOU'}</div><div class="msg-bub" style="font-size:13px;">${fmt(text)}</div>`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-async function sendSplitMessage() {
-  const input = document.getElementById('splitChatInput');
-  const btn   = document.getElementById('splitSendBtn');
-  const text  = input.value.trim();
-  if (!text || btn.disabled) return;
-  input.value = ''; autoResize(input); btn.disabled = true;
-  addSplitMsg('user', text);
-  splitChatHistory.push({role:'user', content:text});
-
-  const msgs = document.getElementById('splitChatMsgs');
-  const td = document.createElement('div');
-  td.id='splitTyping'; td.className='msg ai';
-  td.innerHTML=`<div class="msg-av ai" style="width:26px;height:26px;font-size:9px;">A</div><div class="msg-bub"><div class="t-dot-wrap"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div></div>`;
-  msgs.appendChild(td); msgs.scrollTop=msgs.scrollHeight;
+Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific to their MOS and exposures. Return ONLY valid JSON.`;
 
   try {
-    const resp = await callClaude(splitChatHistory, buildSystemPrompt() + '\n\nContext: Veteran is reviewing their roadmap.');
-    document.getElementById('splitTyping')?.remove();
-    addSplitMsg('ai', resp);
-    splitChatHistory.push({role:'assistant', content:resp});
+    const data = await callClaude([{role:'user',content:prompt}], 2000);
+    clearInterval(stepInterval);
+    const text = data.content?.[0]?.text || '{}';
+    const clean = text.replace(/```json|```/g,'').trim();
+    roadmapData = JSON.parse(clean);
+
+    // Build conditions from roadmap
+    conditions = roadmapData.conditions?.map((c, i) => ({
+      id: 'local-'+i, name: c.name, rating: 0, col: 'todo',
+      type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
+      nexus: c.nexus, evidence_need: c.evidence_need, action: c.action,
+      secondaryTo: c.secondaryTo||'', cfr: c.cfr||'',
+      ratingCriteria: c.ratingCriteria||[]
+    })) || [];
+
+    if (currentUser) await saveRoadmapToSupabase();
+    showView('vApp');
+    showPage('roadmap');
+    renderRoadmap(roadmapData);
+    renderDashboard();
+    updateSidebar();
   } catch(e) {
-    document.getElementById('splitTyping')?.remove();
-    addSplitMsg('ai', 'Connection issue — ' + e.message);
+    clearInterval(stepInterval);
+    console.error('Roadmap error:', e);
+    // fallback
+    roadmapData = { summary: 'Your roadmap is ready.', conditions:[], error: e.message };
+    showView('vApp');
+    showPage('roadmap');
+    renderRoadmap(roadmapData);
   }
-  btn.disabled = false;
-}
-
-function handleSplitKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSplitMessage(); }
-}
-
-function printRoadmap() { window.print(); }
-
-function emailRoadmap() {
-  const subject = encodeURIComponent('My VA Disability Claim Roadmap — Mission: Connected');
-  const body = encodeURIComponent(`My VA claim roadmap from Mission: Connected:\n\nVeteran: ${(ans.branch||[]).join('/')} — ${ans.mos||''}\nGoal: ${ans.goal}\n\nGenerated at missionconnected.vet`);
-  window.open(`mailto:?subject=${subject}&body=${body}`);
-}
-
-function fmt(t) {
-  if (!t) return '';
-  return t
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:#f5f5f5;border:1px solid #e0e0e0;padding:1px 5px;border-radius:3px;font-size:12px;font-family:monospace;">$1</code>')
-    .replace(/^## (.+)$/gm,'<div style="font-size:15px;font-weight:700;color:var(--blue);margin:16px 0 6px;padding-top:10px;border-top:1px solid var(--blue-light);">$1</div>')
-    .replace(/^### (.+)$/gm,'<div style="font-size:14px;font-weight:600;color:var(--text);margin:10px 0 4px;">$1</div>')
-    .replace(/^- (.+)$/gm,'<div style="display:flex;gap:7px;margin:3px 0;font-size:14px;"><span style="color:var(--blue-mid);flex-shrink:0;margin-top:2px;">•</span><span>$1</span></div>')
-    .replace(/^(\d+)\. (.+)$/gm,'<div style="display:flex;gap:8px;margin:5px 0;font-size:14px;"><span style="color:var(--blue);flex-shrink:0;font-weight:700;min-width:20px;">$1.</span><span>$2</span></div>')
-    .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
-}
-
-// =======================================================
-// APP NAVIGATION
-// =======================================================
-function showPage(p) {
-  document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
-  document.getElementById('page-' + p)?.classList.add('active');
-  document.getElementById('nav-' + p)?.classList.add('active');
-  if (p === 'regulations' && !document.getElementById('regsTree').innerHTML) buildRegsTree();
-  if (p === 'dashboard') renderDashboard();
-  if (p === 'tracker') renderTracker();
 }
 
 function updateSidebar() {
-  const branch = (ans.branch||[]).join('/') || 'Veteran';
-  const isReserve = ['Reserve','National Guard'].includes(ans.component);
-  document.getElementById('sbName').textContent = `${branch} Veteran`;
-  document.getElementById('sbMeta').textContent = [ans.mos, ans.component].filter(Boolean).join(' · ') + (isReserve ? ' ⚠️' : '') || 'Screener complete';
-  const c = calcCombined();
-  document.getElementById('sbRating').textContent = c > 0 ? c + '% Combined' : 'View Roadmap';
+  if (!roadmapData) return;
+  const branch = ans.branch?.[0] || 'Veteran';
+  document.getElementById('sbName').textContent = branch + ' Veteran';
+  document.getElementById('sbMeta').textContent = `${roadmapData.totalConditions||conditions.length} conditions identified`;
+  document.getElementById('sbRating').textContent = conditions.length + ' Claims →';
+  document.getElementById('roadmapSub').textContent = `${conditions.length} conditions · Built ${new Date().toLocaleDateString()}`;
 }
 
-// =======================================================
-// CONTEXT BUILDER
-// =======================================================
-function buildAnswerContext() {
-  const lines = [];
-  const isReserve = ['Reserve','National Guard'].includes(ans.component);
-  if (ans.goal)               lines.push(`Goal: ${ans.goal}`);
-  if (ans.branch?.length)     lines.push(`Branch: ${ans.branch.join(', ')}`);
-  if (ans.component)          lines.push(`Component: ${ans.component}${isReserve ? ' (RESERVIST)' : ''}`);
-  if (ans.startYear)          lines.push(`Service entry: ${ans.startYear}`);
-  if (ans.endYear)            lines.push(`Separation: ${ans.endYear}`);
-  if (ans.discharge)          lines.push(`Discharge: ${ans.discharge}`);
-  if (ans.mos)                lines.push(`MOS/AFSC: ${ans.mos}`);
-  if (ans.deployments?.length)lines.push(`Deployments: ${ans.deployments.join(', ')}`);
-  if (ans.exposures?.length)  lines.push(`Toxic exposures: ${ans.exposures.join(', ')}`);
-  if (ans.vaStatus)           lines.push(`VA status: ${ans.vaStatus}`);
-  if (ans.ratedConditions?.length) lines.push(`Currently rated: ${ans.ratedConditions.join(', ')}`);
-  if (ans.otherRated)         lines.push(`Other rated: ${ans.otherRated}`);
-  if (ans.symptoms?.length)   lines.push(`Symptoms: ${ans.symptoms.join(', ')}`);
-  if (ans.diagnoses?.length)  lines.push(`Diagnoses: ${ans.diagnoses.join(', ')}`);
-  if (ans.otherDiag)          lines.push(`Other diagnoses: ${ans.otherDiag}`);
-  if (ans.events?.length)     lines.push(`In-service events: ${ans.events.join(', ')}`);
-  if (ans.evidence?.length)   lines.push(`Evidence on hand: ${ans.evidence.join(', ')}`);
-  if (ans.impact?.length)     lines.push(`Life impact: ${ans.impact.join(', ')}`);
-  ans.followupQs?.forEach(q => { const a = ans.followupAs[q.id]; if (a) lines.push(`[Q] ${q.text} → ${a}`); });
-  return lines.join('\n');
-}
+// ── RENDER ROADMAP ──
+function renderRoadmap(data) {
+  const el = document.getElementById('roadmapContent');
+  if (!el) return;
+  if (!data || !data.conditions) { el.innerHTML = '<div class="empty-state">Roadmap could not be generated. Please retry.</div>'; return; }
 
-function buildSystemPrompt() {
-  const isReserve = ['Reserve','National Guard'].includes(ans.component);
-  return `You are Aylene, a VA disability claims advocate and advisor. You are direct, warm, and knowledgeable — like a trusted friend who has navigated the VA system for years.
+  const typeColors = { direct:'#002855', secondary:'#0076CE', presumptive:'#6D28D9', lay:'#16A34A' };
+  const typeLabels = { direct:'Direct Service', secondary:'Secondary', presumptive:'Presumptive', lay:'Lay Evidence' };
 
-PERSONALITY: Conversational, human, never robotic. Short sentences, plain language. Never pad responses. Always answer in 1-3 sentences unless the question genuinely requires more depth. When citing regulations, always reference the specific CFR title and section (e.g., 38 CFR 3.303).
+  const high = data.conditions.filter(c=>c.priority==='high');
+  const mid = data.conditions.filter(c=>c.priority==='medium');
+  const low = data.conditions.filter(c=>c.priority==='low'||!c.priority);
 
-${isReserve ? 'VETERAN IS RESERVIST: Sparse STRs are normal. Focus on civilian records, personal statements, buddy statements. LOD rules for drill injuries.' : ''}
-
-VETERAN PROFILE:
-${buildAnswerContext()}
-
-RULES:
-- Always reference their actual MOS, branch, and specific conditions
-- Be their advocate, not a bureaucrat
-- Keep chat responses SHORT (1-3 sentences unless complex)
-- Never say "I understand" or "Great question" — just answer`;
-}
-
-// =======================================================
-// DASHBOARD — KANBAN BOARD
-// =======================================================
-const KANBAN_COLS = [
-  {id:'todo',   label:'To Do',      cls:'kcol-todo'},
-  {id:'inprog', label:'In Progress',cls:'kcol-inprog'},
-  {id:'filed',  label:'Filed',      cls:'kcol-filed'},
-  {id:'won',    label:'Won',        cls:'kcol-won'},
-];
-
-function buildChecksFor(name) {
-  const n = name.toLowerCase();
-  if (n.includes('tinnitus') || n.includes('ringing')) {
-    return [{id:'dx',text:'No diagnosis needed — your own testimony is legally sufficient',done:false},{id:'stmt',text:'Write personal statement: describe when ringing started',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('hearing loss')) {
-    return [{id:'audio',text:'Get audiogram (hearing test) from VA or private audiologist',done:false},{id:'stmt',text:'Write personal statement describing noise exposure',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('ptsd') || n.includes('nightmar') || n.includes('flashback')) {
-    return [{id:'dx',text:'Get mental health evaluation and formal PTSD diagnosis',done:false},{id:'stressor',text:'Document your in-service stressor',done:false},{id:'stmt',text:'Write personal statement describing stressor and current symptoms',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('anxiety') || n.includes('depress')) {
-    return [{id:'dx',text:'Get formal diagnosis from mental health provider',done:false},{id:'nexus',text:'Get nexus letter linking condition to service or rated condition',done:false},{id:'stmt',text:'Write personal statement',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('sleep apnea') || n.includes('apnea')) {
-    return [{id:'dx',text:'Complete sleep study and get formal diagnosis',done:false},{id:'nexus',text:'Get nexus letter linking to PTSD, obesity, or direct service connection',done:false},{id:'cpap',text:'Get CPAP prescription (affects rating level)',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('back') || n.includes('spine') || n.includes('lumbar') || n.includes('cervical')) {
-    return [{id:'dx',text:'Get imaging (X-ray or MRI) and formal diagnosis',done:false},{id:'rom',text:'Document range of motion limitations with your doctor',done:false},{id:'nexus',text:'Get nexus letter linking to military service',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('knee') || n.includes('shoulder') || n.includes('hip') || n.includes('foot') || n.includes('ankle')) {
-    return [{id:'dx',text:'Get imaging and formal orthopedic diagnosis',done:false},{id:'nexus',text:'Get nexus letter linking to military service',done:false},{id:'buddy',text:'Get buddy statement from fellow service member if possible',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  if (n.includes('diabetes')) {
-    return [{id:'dx',text:'Get formal Type 2 diabetes diagnosis',done:false},{id:'presumptive',text:'Confirm Agent Orange / herbicide exposure during service',done:false},{id:'form',text:'File VA Form 21-526EZ — presumptive, no nexus letter needed',done:false}];
-  }
-  if (n.includes('hypertension') || n.includes('blood pressure')) {
-    return [{id:'dx',text:'Document hypertension diagnosis with readings over time',done:false},{id:'nexus',text:'Get nexus letter (secondary to sleep apnea, PTSD, or direct)',done:false},{id:'form',text:'File VA Form 21-526EZ',done:false}];
-  }
-  return [
-    {id:'dx',text:'Get formal diagnosis from a licensed provider',done:false},
-    {id:'strs',text:'Review service records for any in-service documentation',done:false},
-    {id:'nexus',text:'Get nexus letter linking condition to military service',done:false},
-    {id:'stmt',text:'Write personal statement (VA Form 21-4138)',done:false},
-    {id:'form',text:'File VA Form 21-526EZ',done:false},
-  ];
-}
-
-function autoBuildDashboard() {}
-function saveDashboard() { saveClaims(); }
-
-function renderDashboard() {
-  localStorage.setItem('mc6_roadmap_confirmed', '1');
-  const won   = claims.filter(d => d.col === 'won').length;
-  const total = claims.length;
-
-  const hero = `
-    <div class="board-hero">
+  let html = `
+    <div class="rm-hero">
+      <div style="font-size:40px">🎯</div>
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.65);margin-bottom:4px;">Case Dashboard</div>
-        <div style="font-size:17px;font-weight:600;color:var(--white);">${(ans.branch||[]).join('/')||'Veteran'} · ${ans.mos||'MOS on file'}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:3px;">${total} condition${total!==1?'s':''} tracked · drag to update status</div>
+        <div class="rm-hero-tag">Your Personalized Blueprint</div>
+        <div class="rm-hero-title">${data.conditions.length} Conditions Identified</div>
+        <div class="rm-hero-sub">${data.summary||''}</div>
       </div>
-      <div class="board-stats">
-        <div class="board-stat"><div class="board-stat-val">${total}</div><div class="board-stat-lbl">Total</div></div>
-        <div class="board-stat"><div class="board-stat-val" style="color:var(--gold);">${calcCombined()}%</div><div class="board-stat-lbl">Est. Combined</div></div>
-        <div class="board-stat"><div class="board-stat-val" style="color:#66bb6a;">${won}</div><div class="board-stat-lbl">Won</div></div>
-      </div>
-      <button class="btn no-print" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;margin-left:10px;font-size:12px;padding:6px 14px;border-radius:var(--r);cursor:pointer;" onclick="openAddModal()">＋ Add</button>
+    </div>
+    <div class="legend-bar">
+      <span class="legend-label">Claim Type:</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#002855"></span>Direct Service</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#0076CE"></span>Secondary</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#6D28D9"></span>Presumptive</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#16A34A"></span>Lay Evidence</span>
     </div>`;
 
-  const typeColors = {'DIRECT':'#c8a84b','SECONDARY':'var(--blue-mid)','PRESUMPTIVE':'var(--purple)','LAY TESTIMONY':'var(--green)'};
+  if (data.pact_note) html += `<div class="alert alert-amber"><span>⚠️</span><span><strong>PACT Act:</strong> ${data.pact_note}</span></div>`;
+  if (data.tdiu) html += `<div class="alert alert-green"><span>💡</span><span><strong>TDIU Opportunity:</strong> ${data.tdiu_note||'You may qualify for Total Disability based on Individual Unemployability.'}</span></div>`;
 
-  const board = `<div class="kanban" id="kanbanBoard">
-    ${KANBAN_COLS.map(col => {
-      const cards = claims.filter(d => d.col === col.id);
-      const cardHtml = cards.map(item => {
-        const idx = claims.indexOf(item);
-        const doneCount = (item.checks||[]).filter(c => c.done).length;
-        const totalSteps = (item.checks||[]).length;
-        const pct = totalSteps ? Math.round((doneCount/totalSteps)*100) : 0;
-        const tc = typeColors[item.type] || 'var(--blue)';
-        const checksHtml = item.expanded ? `
-          <div class="kcard-checks">
-            ${(item.checks||[]).map((c,ci) => `
-              <div class="check-item ${c.done?'checked':''}" onclick="toggleKCheck(${idx},${ci});event.stopPropagation()">
-                <div class="check-box">${c.done?'✓':''}</div>
-                <div class="check-text">${c.text}</div>
-              </div>`).join('')}
-          </div>` : '';
-        return `
-          <div class="kcard" id="kcard-${idx}" draggable="true"
-            ondragstart="dragStart(event,${idx})" ondragend="dragEnd(event)"
-            onclick="toggleKCard(${idx})">
-            <div style="display:flex;align-items:flex-start;gap:6px;justify-content:space-between;">
-              <div class="kcard-name">${item.name}</div>
-              <div style="display:flex;gap:4px;flex-shrink:0;">
-                <button style="background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:12px;padding:0;" onclick="openEditModal(${idx});event.stopPropagation()" title="Edit">✏️</button>
-                <button style="background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:12px;padding:0;" onclick="removeClaim(${idx});event.stopPropagation()" title="Remove">✕</button>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-              <span class="kcard-basis" style="background:${tc}22;color:${tc};">${item.type}</span>
-              ${item.rating ? `<span style="font-size:11px;font-weight:700;color:var(--blue);">${item.rating}%</span>` : ''}
-            </div>
-            <div class="kcard-progress"><div class="kcard-prog-fill" style="width:${pct}%;background:${col.id==='won'?'var(--green)':col.id==='filed'?'var(--blue-mid)':'var(--blue)'}"></div></div>
-            <div class="kcard-meta">
-              <span>${doneCount}/${totalSteps} steps</span>
-              <span style="color:var(--blue-mid);">${item.expanded?'▴ hide':'▾ steps'}</span>
-            </div>
-            ${checksHtml}
-            <div class="kcard-actions" onclick="event.stopPropagation()">
-              ${col.id !== 'won'
-                ? `<button class="kbtn kbtn-advance" onclick="advanceCard(${idx})">→ Next</button>`
-                : `<span style="font-size:11px;color:var(--green);font-weight:600;">🏆 Won</span>`}
-            </div>
-          </div>`;
-      }).join('') || `<div style="padding:20px 10px;text-align:center;font-size:12px;color:var(--text-hint);border:2px dashed var(--border);border-radius:var(--r);margin:6px;">Drop here</div>`;
+  const renderGroup = (conds, label) => {
+    if (!conds.length) return '';
+    return `<div class="rm-section-hdr">${label}</div>` + conds.map(c => renderCondCard(c, typeColors, typeLabels)).join('');
+  };
 
-      return `
-        <div class="kanban-col ${col.cls}" id="kcol-${col.id}"
-          ondragover="event.preventDefault()" ondrop="dropCard(event,'${col.id}')">
-          <div class="kanban-col-hdr">
-            <div class="kanban-col-title">${col.label}</div>
-            <div class="kanban-col-count">${cards.length}</div>
-          </div>
-          <div class="kanban-cards">${cardHtml}</div>
-        </div>`;
-    }).join('')}
+  html += renderGroup(high, '🔴 High Priority');
+  html += renderGroup(mid, '🟡 Medium Priority');
+  html += renderGroup(low, '🔵 Lower Priority');
+
+  if (data.top_action) {
+    html += `<div class="rm-action-bar">
+      <div style="font-size:28px">⚡</div>
+      <div style="flex:1">
+        <div class="rm-action-text">Your #1 Next Action</div>
+        <div class="rm-action-sub">${data.top_action}</div>
+      </div>
+      <button class="btn btn-gold" onclick="requireAuth(()=>showPage('chat'))">💬 Ask Aylene</button>
+    </div>`;
+  }
+
+  html += `<div class="rm-gate-notice" id="roadmapGate">🔒 <strong>Create a free account</strong> to save this roadmap, print it, and chat with Aylene. <button class="btn btn-primary" style="margin-left:12px" onclick="openAuth('signup')">Save My Roadmap →</button></div>`;
+
+  el.innerHTML = html;
+  if (currentUser) document.getElementById('roadmapGate')?.remove();
+  updateSidebar();
+}
+
+function renderCondCard(c, typeColors, typeLabels) {
+  const color = typeColors[c.type] || '#002855';
+  const label = typeLabels[c.type] || c.type;
+  return `
+  <div class="cond-card">
+    <div class="cond-card-hdr lborder-${c.type}" onclick="toggleCondBody(this)">
+      <div style="flex:1">
+        <div class="cond-name">${c.name}</div>
+        <span class="cond-pri-badge badge-${c.type}">${label}</span>
+        ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec);margin-left:6px">↳ Secondary to ${c.secondaryTo}</span>` : ''}
+        ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint);margin-left:8px">${c.cfr}</span>` : ''}
+      </div>
+      <div class="cond-toggle">▼</div>
+    </div>
+    <div class="cond-body">
+      <div class="ele-grid">
+        ${c.nexus ? `<div class="ele-row ele-row-blue"><div class="ele-label b">NEXUS</div><div class="ele-val">${c.nexus}</div></div>` : ''}
+        ${c.evidence_have ? `<div class="ele-row ele-row-green"><div class="ele-label g">HAVE</div><div class="ele-val">${c.evidence_have}</div></div>` : ''}
+        ${c.evidence_need ? `<div class="ele-row ele-row-red"><div class="ele-label r">NEED</div><div class="ele-val">${c.evidence_need}</div></div>` : ''}
+        ${c.action ? `<div class="ele-row ele-row-blue"><div class="ele-label b">ACTION</div><div class="ele-val">${c.action}</div></div>` : ''}
+      </div>
+      ${c.ratingCriteria?.length ? `
+      <div class="rating-criteria">
+        <div class="rating-criteria-hdr">📊 VA Rating Criteria (38 CFR Part 4) — Read and interpret based on your symptoms</div>
+        ${c.ratingCriteria.map(r => `<div class="rating-row"><div class="r-pct">${r.pct}%</div><div class="r-desc">${r.desc}</div></div>`).join('')}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function toggleCondBody(hdr) {
+  const body = hdr.nextElementSibling;
+  body?.classList.toggle('open');
+  hdr.querySelector('.cond-toggle').textContent = body?.classList.contains('open') ? '▲' : '▼';
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+  const el = document.getElementById('dashContent');
+  if (!el) return;
+  if (!conditions.length) { el.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">📊</div>Complete your screener to activate your dashboard.</div>'; return; }
+
+  const branch = ans.branch?.[0] || 'Unknown';
+  const mos = ans.mos?.title || 'Unknown MOS';
+  const start = ans.startYear || '?';
+  const end = ans.endYear || 'Present';
+  const estimated = Math.min(conditions.length * 12, 90);
+
+  let html = `
+  <div class="dash-hero">
+    <div class="dash-hero-top">
+      <div>
+        <div class="dash-branch-tag">🎖️ ${branch.toUpperCase()}</div>
+        <div class="dash-vet-name">${branch} Veteran</div>
+        <div class="dash-vet-meta">${mos} · ${start}–${end} · ${ans.component||''}</div>
+      </div>
+    </div>
+    <div class="dash-stats-row">
+      <div><div class="dash-stat-val">${conditions.length}</div><div class="dash-stat-lbl">Conditions</div></div>
+      <div><div class="dash-stat-val">${conditions.filter(c=>c.col==='won').length}</div><div class="dash-stat-lbl">Won</div></div>
+      <div><div class="dash-stat-val">${estimated}%</div><div class="dash-stat-lbl">Est. Max Rating</div></div>
+    </div>
+  </div>
+
+  <div class="gauge-section">
+    <div class="gauge-card">
+      <div class="gauge-title">Combined Rating Potential</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 200 110">
+          <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#E5E7EB" stroke-width="18" stroke-linecap="round"/>
+          <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#002855" stroke-width="18" stroke-linecap="round"
+            stroke-dasharray="${Math.PI * 90 * estimated / 100} ${Math.PI * 90}" />
+          <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#C9A84C" stroke-width="18" stroke-linecap="round" stroke-opacity="0.25"/>
+        </svg>
+        <div class="gauge-center-val"><div class="gauge-pct">${estimated}%</div><div class="gauge-pct-label">Estimated</div></div>
+      </div>
+      <div class="gauge-legend">
+        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#002855"></div>Current</div>
+        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#C9A84C"></div>Potential</div>
+      </div>
+    </div>
+    <div class="service-profile">
+      <div class="sp-header"><div class="sp-title">Service Profile</div></div>
+      <div class="sp-grid">
+        <div class="sp-item"><div class="sp-item-label">Branch</div><div class="sp-item-val">${branch}</div></div>
+        <div class="sp-item"><div class="sp-item-label">Component</div><div class="sp-item-val ${!ans.component?'empty':''}">${ans.component||'Not specified'}</div></div>
+        <div class="sp-item"><div class="sp-item-label">MOS / Rate</div><div class="sp-item-val ${!ans.mos?.code?'empty':''}">${ans.mos?.code ? ans.mos.code+' — '+ans.mos.title : 'Not specified'}</div></div>
+        <div class="sp-item"><div class="sp-item-label">Service Dates</div><div class="sp-item-val">${start} – ${end}</div></div>
+        <div class="sp-item"><div class="sp-item-label">Discharge</div><div class="sp-item-val ${!ans.discharge?'empty':''}">${ans.discharge||'Not specified'}</div></div>
+        <div class="sp-item"><div class="sp-item-label">Deployments</div><div class="sp-item-val ${!ans.deployments?.length?'empty':''}">${ans.deployments?.join(', ')||'None listed'}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Claim Kanban</div></div>
+    <div class="card-body">
+      <div class="kanban">
+        ${renderKanbanCol('todo','📋 To Do','gray')}
+        ${renderKanbanCol('inprog','🔄 In Progress','amber')}
+        ${renderKanbanCol('filed','📮 Filed','sky')}
+        ${renderKanbanCol('won','✅ Won','green')}
+      </div>
+    </div>
   </div>`;
 
-  document.getElementById('dashContent').innerHTML = hero + board;
+  el.innerHTML = html;
 }
 
-let dragIdx = null;
-function dragStart(e, idx) { dragIdx = idx; e.currentTarget.classList.add('dragging'); }
-function dragEnd(e) { e.currentTarget.classList.remove('dragging'); dragIdx = null; }
-function dropCard(e, colId) {
-  e.preventDefault();
-  if (dragIdx === null) return;
-  claims[dragIdx].col = colId;
-  claims[dragIdx].status = colId;
-  saveClaims(); renderDashboard(); renderTracker(); updateSidebar();
+function renderKanbanCol(status, title, color) {
+  const conds = conditions.filter(c => c.col === status);
+  return `<div class="kanban-col kcol-${status}">
+    <div class="kanban-col-hdr">
+      <div class="kanban-col-title">${title}</div>
+      <div class="kanban-col-count">${conds.length}</div>
+    </div>
+    ${conds.map(c => renderKcard(c)).join('')}
+    ${!conds.length ? `<div style="font-size:12px;color:var(--text-hint);text-align:center;padding:16px">No conditions yet</div>` : ''}
+  </div>`;
 }
 
-function advanceCard(idx) {
-  const order = ['todo','inprog','filed','won'];
-  const cur = order.indexOf(claims[idx].col);
-  if (cur < order.length - 1) {
-    claims[idx].col = order[cur+1];
-    claims[idx].status = claims[idx].col;
-    saveClaims(); renderDashboard(); renderTracker(); updateSidebar();
+function renderKcard(c) {
+  const total = c.checks?.length || 0;
+  const done = c.checks?.filter(ch => ch.done)?.length || 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const colMap = { direct:'#002855', secondary:'#0076CE', presumptive:'#6D28D9', lay:'#16A34A' };
+  const col = colMap[c.type] || '#9CA3AF';
+  return `<div class="kcard">
+    <div class="kcard-name">${c.name}</div>
+    <span class="kcard-basis" style="background:${col}20;color:${col}">${c.type||'direct'}</span>
+    ${total > 0 ? `
+    <div class="kcard-progress"><div class="kcard-prog-fill" style="width:${pct}%;background:${col}"></div></div>
+    <div class="kcard-meta"><span>${done}/${total} steps</span><span>${pct}%</span></div>` : ''}
+    ${total > 0 ? `<div class="kcard-checks">${(c.checks||[]).map((ch,i) => `
+      <div class="check-item ${ch.done?'checked':''}" onclick="toggleCheck('${c.id}',${i})">
+        <div class="check-box">${ch.done?'✓':''}</div>
+        <div class="check-text">${ch.text}</div>
+      </div>`).join('')}</div>` : ''}
+    ${c.col !== 'won' ? `<button class="kbtn-advance" onclick="advanceCondition('${c.id}')" style="margin-top:8px">Advance →</button>` : ''}
+  </div>`;
+}
+
+function toggleCheck(condId, checkIdx) {
+  const c = conditions.find(c => c.id === condId);
+  if (c?.checks?.[checkIdx]) {
+    c.checks[checkIdx].done = !c.checks[checkIdx].done;
+    renderDashboard();
+    saveConditions();
   }
 }
 
-function toggleKCard(idx) {
-  claims[idx].expanded = !claims[idx].expanded;
-  saveClaims(); renderDashboard();
+function advanceCondition(condId) {
+  const c = conditions.find(c => c.id === condId);
+  if (!c) return;
+  const flow = ['todo','inprog','filed','won'];
+  const idx = flow.indexOf(c.col);
+  if (idx < flow.length - 1) c.col = flow[idx + 1];
+  renderDashboard();
+  saveConditions();
 }
 
-function toggleKCheck(itemIdx, checkIdx) {
-  if (!claims[itemIdx].checks) return;
-  claims[itemIdx].checks[checkIdx].done = !claims[itemIdx].checks[checkIdx].done;
-  const item = claims[itemIdx];
-  const allDone = item.checks.every(c => c.done);
-  if (allDone && item.col === 'inprog') { item.col='filed'; item.status='filed'; }
-  else if (allDone && item.col === 'todo') { item.col='inprog'; item.status='inprog'; }
-  saveClaims(); renderDashboard(); renderTracker();
-}
-
-function addDashItem() { openAddModal(); }
-
-function inferCondType(name) {
-  const n = name.toLowerCase();
-  if (n.includes('tinnitus') || n.includes('ringing') || n.includes('migrain') || n.includes('anxiety')) return 'LAY TESTIMONY';
-  if (n.includes('diabetes') || n.includes('presumptive') || n.includes('cancer') || n.includes('bronchiolitis')) return 'PRESUMPTIVE';
-  if (n.includes('sleep apnea') || n.includes('depression') || n.includes('hypertension') || n.includes('neuropathy')) return 'SECONDARY';
-  return 'DIRECT';
-}
-
-// =======================================================
-// CHAT
-// =======================================================
-function initChat() {
-  if (chatHistory.length) return;
-  const isReserve = ['Reserve','National Guard'].includes(ans.component);
-  const reserveNote = isReserve ? " I know your Reserve/Guard service means we'll lean on civilian records over STRs — I've got that covered." : '';
-  addMsg('ai', `Hey — I'm Aylene, your claim advisor.${reserveNote} Your roadmap's ready. What do you want to dig into first?`);
-}
-
-function addMsg(role, text) {
-  const msgs = document.getElementById('chatMsgs');
-  const div = document.createElement('div');
-  div.className = 'msg ' + role;
-  div.innerHTML = `<div class="msg-av ${role}">${role==='ai'?'A':'YOU'}</div><div class="msg-bub">${fmt(text)}</div>`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function addTyping() {
-  const msgs = document.getElementById('chatMsgs');
-  const div = document.createElement('div');
-  div.className = 'msg ai'; div.id = 'typdiv';
-  div.innerHTML = `<div class="msg-av ai">A</div><div class="msg-bub"><span style="font-size:11px;color:var(--text-hint);font-style:italic;margin-right:6px;">Aylene is typing</span><div class="t-dot-wrap" style="display:inline-flex;"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div></div>`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function removeTyping() { document.getElementById('typdiv')?.remove(); }
-
-async function sendMessage() {
-  const input = document.getElementById('chatInput');
-  const btn   = document.getElementById('sendBtn');
-  const text  = input.value.trim();
-  if (!text || btn.disabled) return;
-  input.value = ''; autoResize(input); btn.disabled = true;
-  addMsg('user', text);
-  chatHistory.push({role:'user', content:text});
-  addTyping();
+async function saveConditions() {
+  if (!supabase || !currentUser) return;
   try {
-    const resp = await callClaude(chatHistory, buildSystemPrompt());
-    removeTyping();
-    addMsg('ai', resp);
-    chatHistory.push({role:'assistant', content:resp});
-  } catch(e) {
-    removeTyping();
-    addMsg('ai', `**Connection issue.** ${e.message}`);
-  }
-  btn.disabled = false;
-}
-
-function clearChat() { chatHistory = []; document.getElementById('chatMsgs').innerHTML = ''; initChat(); }
-function handleChatKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
-function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 110) + 'px'; }
-
-// =======================================================
-// PDF TEXT EXTRACTION
-// =======================================================
-async function extractPDFText(file) {
-  if (!window.pdfjsLib) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    });
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  let text = '';
-  const maxPages = Math.min(pdf.numPages, 25);
-  for (let i = 1; i <= maxPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(item => item.str).join(' ') + '\n';
-  }
-  return text.trim();
-}
-
-// =======================================================
-// DECISION LETTER ANALYSIS
-// =======================================================
-async function handleDLUpload(files) {
-  if (!files.length) return;
-  dlDocs = [{name:files[0].name, size:files[0].size, file:files[0], analyzed:false, result:null}];
-  renderDLList(); analyzeDL(files[0]);
-}
-
-function renderDLList() {
-  document.getElementById('dlFileList').innerHTML = dlDocs.map(d => `
-    <div class="file-row" style="margin-top:8px;">
-      <span style="font-size:18px;">📮</span>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:500;">${d.name}</div></div>
-      ${d.analyzed ? '<span class="badge-done">✓ Analyzed</span>' : '<span class="badge-analyzing">⏳ Analyzing...</span>'}
-    </div>`).join('');
-}
-
-async function analyzeDL(file) {
-  let text = '';
-  try {
-    if (file.type === 'application/pdf') {
-      try { text = await extractPDFText(file); }
-      catch(pdfErr) { text = '[PDF extraction failed — please paste the letter text directly]'; }
-    } else {
-      text = await file.text();
+    for (const c of conditions) {
+      if (c.id?.startsWith('local-')) {
+        const { data } = await supabase.from('claims').insert({
+          user_id: currentUser.id, name: c.name, rating: c.rating||0,
+          col: c.col, type: c.type, checks: c.checks
+        }).select().single();
+        if (data) c.id = data.id;
+      } else {
+        await supabase.from('claims').update({ col: c.col, checks: c.checks, rating: c.rating }).eq('id', c.id);
+      }
     }
-    if (text.length > 14000) text = text.substring(0, 14000) + '...[truncated]';
-    const prompt = `You are a VA disability claims expert analyzing a decision letter.
-
-VETERAN PROFILE:\n${buildAnswerContext()}
-
-DECISION LETTER:\n${text}
-
-Respond in EXACTLY this structure:
-
-## FAVORABLE FINDINGS — What the VA Found in Your Favor
-List every concession, acknowledgment, or partially favorable finding.
-
-## WHY IT WAS DENIED OR RATED LOW
-Plain language. Specific per condition.
-
-## THE GAP — What's Missing
-The exact 1-3 things that would flip this decision.
-
-## YOUR NEXT STEP
-Recommended appeal lane (Supplemental/HLR/BVA) and why. Include form numbers.
-
-## DON'T GIVE UP
-What these findings mean for their next filing.`;
-
-    const resp = await callClaude([{role:'user',content:prompt}], 'VA claims expert. Be specific. This analysis could change a veteran\'s life.', 2500);
-    const d = dlDocs[0]; if (d) { d.analyzed=true; d.result=resp; }
-  } catch(e) {
-    const d = dlDocs[0]; if (d) { d.analyzed=true; d.result='Error: '+e.message; }
-  }
-  renderDLList(); renderDLAnalysis();
-}
-
-function renderDLAnalysis() {
-  const doc = dlDocs[0];
-  if (!doc?.result) return;
-  const card = document.getElementById('dlAnalysisCard');
-  card.style.display = 'block';
-  const content = document.getElementById('dlAnalysisContent');
-  if (typeof doc.result === 'string') {
-    const text = doc.result;
-    const sections = [
-      {key:'FAVORABLE FINDINGS',cls:'dl-green',icon:'✅'},
-      {key:'WHY IT WAS DENIED',cls:'dl-red',icon:'❌'},
-      {key:'THE GAP',cls:'dl-amber',icon:'🎯'},
-      {key:'YOUR NEXT STEP',cls:'dl-blue',icon:'➡️'},
-      {key:"DON'T GIVE UP",cls:'dl-green',icon:'💪'},
-    ];
-    let html = '';
-    sections.forEach((sec, i) => {
-      const nextKey = sections[i+1]?.key;
-      const start = text.indexOf('## ' + sec.key);
-      if (start === -1) return;
-      const end = nextKey ? text.indexOf('## ' + nextKey) : text.length;
-      const body = text.substring(start + sec.key.length + 4, end).trim();
-      html += `<div class="dl-panel ${sec.cls}"><div class="dl-panel-title">${sec.icon} ${sec.key}</div><div class="dl-panel-body">${fmt(body)}</div></div>`;
-    });
-    content.innerHTML = html || `<div style="font-size:14px;line-height:1.7;">${fmt(text)}</div>`;
-  } else {
-    content.innerHTML = `<div class="alert alert-amber"><span>⚠️</span><span>Analysis unavailable.</span></div>`;
-  }
-}
-
-function clearDL() { dlDocs=[]; document.getElementById('dlFileList').innerHTML=''; document.getElementById('dlAnalysisCard').style.display='none'; document.getElementById('dlFileInput').value=''; }
-
-async function handleMedUpload(files) {
-  [...files].forEach(file => {
-    if (medDocs.find(d => d.name === file.name)) return;
-    medDocs.push({name:file.name,size:file.size,file,analyzed:false,result:null});
-    renderMedList(); analyzeMed(file);
-  });
-}
-
-function renderMedList() {
-  document.getElementById('medFileList').innerHTML = medDocs.map((d,i) => `
-    <div class="file-row" style="margin-top:8px;">
-      <span style="font-size:18px;">📄</span>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:500;">${d.name}</div></div>
-      ${d.analyzed ? '<span class="badge-done">✓ Analyzed</span>' : '<span class="badge-analyzing">⏳ Analyzing...</span>'}
-      <button style="background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:14px;" onclick="removeMedDoc(${i})">✕</button>
-    </div>`).join('');
-}
-
-function removeMedDoc(i) { medDocs.splice(i,1); renderMedList(); renderMedAnalysis(); }
-function clearMed() { medDocs=[]; renderMedList(); document.getElementById('medAnalysisCard').style.display='none'; document.getElementById('medFileInput').value=''; }
-
-async function analyzeMed(file) {
-  let text = '';
-  try {
-    if (file.type === 'application/pdf') {
-      try { text = await extractPDFText(file); }
-      catch(pdfErr) { text = '[PDF extraction failed]'; }
-    } else {
-      text = await file.text();
-    }
-    if (text.length>12000) text=text.substring(0,12000)+'...[truncated]';
-    const resp = await callClaude([{role:'user',content:`Analyze this record for VA claim opportunities.\n\nVETERAN:\n${buildAnswerContext()}\n\nDOCUMENT: ${file.name}\n${text}\n\nFind key diagnoses, claim opportunities, evidence provided, conditions not yet claimed, next actions.`}], buildSystemPrompt(), 1500);
-    const d = medDocs.find(x=>x.name===file.name); if(d){d.analyzed=true;d.result=resp;}
-  } catch(e) {
-    const d=medDocs.find(x=>x.name===file.name); if(d){d.analyzed=true;d.result='Error: '+e.message;}
-  }
-  renderMedList(); renderMedAnalysis();
-}
-
-function renderMedAnalysis() {
-  const analyzed = medDocs.filter(d => d.analyzed && d.result);
-  const card = document.getElementById('medAnalysisCard');
-  if (!analyzed.length) { card.style.display='none'; return; }
-  card.style.display='block';
-  document.getElementById('medAnalysisContent').innerHTML = analyzed.map(d => `
-    <div style="background:var(--blue-pale);border:1px solid var(--blue-light);border-radius:var(--r);padding:13px;margin-bottom:10px;">
-      <div style="font-weight:600;color:var(--blue);margin-bottom:7px;">📄 ${d.name}</div>
-      <div style="font-size:13px;line-height:1.7;">${fmt(d.result)}</div>
-    </div>`).join('');
-}
-
-// =======================================================
-// CONDITIONS TRACKER
-// =======================================================
-function autoPopulateConditions() {
-  if (claims.length) return;
-  const seen = new Set();
-  [...(ans.diagnoses||[]),...(ans.symptoms||[])].forEach(name => {
-    if (!seen.has(name.toLowerCase())) {
-      seen.add(name.toLowerCase());
-      claims.push({
-        id: Date.now() + '_' + Math.random().toString(36).slice(2),
-        name,
-        rating: 0,
-        status: 'todo',
-        col: 'todo',
-        type: inferCondType(name),
-        checks: buildChecksFor(name),
-        expanded: false,
-        code: '',
-        secondary: '',
-        notes: ''
-      });
-    }
-  });
-  saveClaims();
-}
-
-function calcCombined() {
-  const rated = claims
-    .filter(c => (c.col === 'won' || c.status === 'connected') && c.rating > 0)
-    .map(c => c.rating).sort((a,b) => b-a);
-  if (!rated.length) return 0;
-  let rem = 100;
-  rated.forEach(r => rem *= (1 - r/100));
-  return Math.min(Math.round((100 - rem) / 10) * 10, 100);
+  } catch(e) { console.warn('Save conditions error:', e); }
 }
 
 function openAddModal() {
-  ['mName','mCode','mSecondary','mNotes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('mRating').value='0';
-  document.getElementById('mStatus').value='todo';
-  document.getElementById('mModalTitle').textContent = 'Add a Condition';
-  document.getElementById('mSaveBtn').onclick = addClaim;
+  document.getElementById('addCondName').value = '';
+  document.getElementById('addCondNotes').value = '';
   document.getElementById('addModal').classList.add('active');
-  setTimeout(() => document.getElementById('mName').focus(), 80);
 }
 
-function openEditModal(idx) {
-  idx = parseInt(idx);
-  const c = claims[idx];
-  if (!c) return;
-  document.getElementById('mName').value = c.name;
-  document.getElementById('mCode').value = c.code || '';
-  document.getElementById('mSecondary').value = c.secondary || '';
-  document.getElementById('mNotes').value = c.notes || '';
-  document.getElementById('mRating').value = c.rating || '0';
-  document.getElementById('mStatus').value = c.col || 'todo';
-  document.getElementById('mModalTitle').textContent = 'Edit Condition';
-  document.getElementById('mSaveBtn').onclick = () => saveClaim(idx);
-  document.getElementById('addModal').classList.add('active');
-  setTimeout(() => document.getElementById('mName').focus(), 80);
-}
+function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
 
-function closeModal() { document.getElementById('addModal').classList.remove('active'); }
-
-function addClaim() {
-  const name = document.getElementById('mName').value.trim();
-  if (!name) { document.getElementById('mName').focus(); return; }
-  const col = document.getElementById('mStatus').value;
-  claims.push({
-    id: Date.now(),
-    name, col,
-    rating: parseInt(document.getElementById('mRating').value) || 0,
-    status: col,
-    type: inferCondType(name),
-    checks: buildChecksFor(name),
-    expanded: false,
-    code: document.getElementById('mCode').value.trim(),
-    secondary: document.getElementById('mSecondary').value.trim(),
-    notes: document.getElementById('mNotes').value.trim()
+function addCondition() {
+  const name = document.getElementById('addCondName').value.trim();
+  if (!name) { alert('Please enter a condition name.'); return; }
+  const type = document.getElementById('addCondBasis').value;
+  const status = document.getElementById('addCondStatus').value;
+  conditions.push({
+    id: 'local-' + Date.now(), name, type, col: status,
+    checks: [
+      {text:'Get current diagnosis from doctor',done:false},
+      {text:'Gather supporting evidence',done:false},
+      {text:'Write personal statement',done:false},
+    ]
   });
-  saveClaims(); closeModal(); renderTracker(); renderDashboard(); updateSidebar();
+  closeModal('addModal');
+  renderDashboard();
+  renderTrackerTable();
+  saveConditions();
 }
 
-function saveClaim(idx) {
-  idx = parseInt(idx);
-  const c = claims[idx];
-  if (!c) return;
-  const col = document.getElementById('mStatus').value;
-  c.name      = document.getElementById('mName').value.trim() || c.name;
-  c.rating    = parseInt(document.getElementById('mRating').value) || 0;
-  c.col       = col;
-  c.status    = col;
-  c.code      = document.getElementById('mCode').value.trim();
-  c.secondary = document.getElementById('mSecondary').value.trim();
-  c.notes     = document.getElementById('mNotes').value.trim();
-  saveClaims(); closeModal(); renderTracker(); renderDashboard(); updateSidebar();
+// ── TRACKER TABLE ──
+function renderTrackerTable() {
+  const tbody = document.getElementById('trackerTableBody');
+  if (!tbody) return;
+  if (!conditions.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No conditions added yet.</td></tr>'; return; }
+  const colLabels = { todo:'To Do', inprog:'In Progress', filed:'Filed', won:'Won ✅' };
+  tbody.innerHTML = conditions.map(c => `
+    <tr>
+      <td><strong>${c.name}</strong></td>
+      <td><span style="font-size:11px;padding:2px 7px;border-radius:3px;background:#dbeafe;color:#002855">${c.type||'direct'}</span></td>
+      <td>–</td>
+      <td>${c.evidence_need||'–'}</td>
+      <td>${colLabels[c.col]||c.col}</td>
+      <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="requireAuth(()=>showPage('dashboard'))">View</button></td>
+    </tr>`).join('');
 }
 
-function removeClaim(idx) {
-  idx = parseInt(idx);
-  if (isNaN(idx) || idx < 0 || idx >= claims.length) return;
-  claims.splice(idx, 1);
-  saveClaims(); renderTracker(); renderDashboard(); updateSidebar();
+// ── AYLENE CHAT ──
+const AYLENE_SYSTEM = `You are Aylene, a 25-year-old U.S. Army veteran and VA disability claims advisor.
+
+PERSONALITY:
+- Warm, calm, and deeply caring about veterans
+- Soft-spoken but confident and extremely knowledgeable
+- Gen Z energy — direct, real, no corporate fluff
+- Shy about your own service; never brag about yourself
+- Keep focus entirely on the veteran you're helping
+- Passionate advocate; this is your calling, not just a job
+
+EXPERTISE:
+- VA disability claims process, C-file requests, rating schedules
+- 38 CFR Part 4, nexus letters, C&P exam preparation
+- TDIU, SMC, appeals (RAMP, BVA, CAVC)
+- PACT Act, burn pit presumptives, Agent Orange
+- Secondary conditions, mental health claims, MST claims
+
+COMMUNICATION STYLE:
+- Conversational, never clinical or robotic
+- Use first-person and address the veteran directly
+- Short-to-medium responses unless detail is truly needed
+- Cite 38 CFR when helpful but explain it in plain language
+- Never guess — say "I'd want to look into that more" when uncertain
+
+WHAT YOU DO NOT DO:
+- Never estimate someone's rating — show criteria, let them interpret
+- Never give legal advice or represent yourself as a lawyer
+- Never discuss anything unrelated to veterans benefits
+- Never talk about yourself extensively`;
+
+const AYLENE_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" style="width:100%;height:100%">
+  <circle cx="40" cy="40" r="40" fill="#E8F4FD"/>
+  <ellipse cx="40" cy="52" rx="20" ry="14" fill="#FFDDB4"/>
+  <circle cx="40" cy="32" r="18" fill="#FFDDB4"/>
+  <ellipse cx="30" cy="30" rx="4" ry="5" fill="white"/>
+  <ellipse cx="50" cy="30" rx="4" ry="5" fill="white"/>
+  <circle cx="30" cy="31" r="2.5" fill="#002855"/>
+  <circle cx="50" cy="31" r="2.5" fill="#002855"/>
+  <path d="M36 38 Q40 41 44 38" stroke="#C9A84C" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M22 28 Q25 22 32 23" stroke="#3B2314" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M48 23 Q55 22 58 28" stroke="#3B2314" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M26 20 Q40 8 54 20 Q54 12 40 10 Q26 12 26 20" fill="#3B2314"/>
+  <path d="M24 24 Q26 14 40 12 Q54 14 56 24 Q50 18 40 18 Q30 18 24 24" fill="#5C3D2E"/>
+</svg>`;
+
+function renderAyleneAvatar() {
+  document.querySelectorAll('.aylene-avatar, #ayleneAvTop').forEach(el => {
+    el.innerHTML = AYLENE_AVATAR_SVG;
+  });
 }
 
-function renderTracker() {
-  document.getElementById('st-combined').textContent = calcCombined() + '%';
-  document.getElementById('st-connected').textContent = claims.filter(c => c.col === 'won').length;
-  document.getElementById('st-pending').textContent   = claims.filter(c => c.col === 'filed').length;
-  document.getElementById('trackerCombined').textContent = calcCombined() + '%';
+function initChat() {
+  renderAyleneAvatar();
+  const msgs = document.getElementById('chatMsgs');
+  if (!msgs) return;
+  msgs.innerHTML = '';
+  chatHistory = [];
+  // brief intro with slight delay
+  setTimeout(() => {
+    const intro = `Hey. I'm Aylene. Here to help with your VA claim — ask me anything.`;
+    appendMsg('ai', intro);
+    chatHistory.push({ role: 'assistant', content: intro });
+  }, 800);
+}
 
-  const tbody = document.getElementById('trackerBody');
-  if (!claims.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:28px;">No conditions yet. Click <strong>+ Add Condition</strong> to start.</div></td></tr>`;
-    return;
+function clearChat() { chatHistory = []; initChat(); }
+
+function appendMsg(role, text) {
+  const msgs = document.getElementById('chatMsgs');
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+  if (role === 'ai') {
+    div.innerHTML = `<div class="msg-av-aylene">${AYLENE_AVATAR_SVG}</div><div class="msg-bub">${text.replace(/\n/g,'<br>')}</div>`;
+  } else {
+    const init = (currentUser?.email?.[0]||'V').toUpperCase();
+    div.innerHTML = `<div class="msg-av-user">${init}</div><div class="msg-bub">${text}</div>`;
   }
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
 
-  tbody.innerHTML = [...claims].map((c, idx) => {
-    const colLabels = {todo:'To Do',inprog:'In Progress',filed:'Filed',won:'✅ Won'};
-    const colColors = {todo:'var(--gray-600)',inprog:'var(--amber)',filed:'var(--blue-mid)',won:'var(--green)'};
-    const lbl   = colLabels[c.col] || 'To Do';
-    const color = colColors[c.col] || 'var(--gray-600)';
-    return `<tr>
-      <td>
-        <div style="font-weight:600;font-size:14px;">${c.name}</div>
-        ${c.secondary ? `<div style="font-size:11px;color:var(--text-hint);">Secondary to: ${c.secondary}</div>` : ''}
-        ${c.notes ? `<div style="font-size:11px;color:var(--text-hint);">${c.notes}</div>` : ''}
-      </td>
-      <td><span style="font-size:13px;font-weight:700;color:var(--blue);background:var(--blue-pale);padding:2px 8px;border-radius:3px;">${c.rating||0}%</span></td>
-      <td><span style="font-size:12px;font-weight:600;color:${color};">${lbl}</span></td>
-      <td style="font-size:12px;color:var(--text-sec);">${c.code||'—'}</td>
-      <td>
-        <button style="background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-sec);font-size:12px;padding:3px 8px;margin-right:4px;" onclick="openEditModal(${idx})">Edit</button>
-        <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:16px;line-height:1;" onclick="removeClaim(${idx})">🗑</button>
-      </td>
-    </tr>`;
+function showTyping() {
+  const msgs = document.getElementById('chatMsgs');
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typingIndicator';
+  div.innerHTML = `<div class="msg-av-aylene">${AYLENE_AVATAR_SVG}</div><div class="msg-bub"><div class="t-dot-wrap"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function hideTyping() { document.getElementById('typingIndicator')?.remove(); }
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = ''; autoResize(input);
+  document.getElementById('sendBtn').disabled = true;
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  // Aylene delay: 2–7 seconds (she doesn't type instantly)
+  const delay = 2000 + Math.random() * 5000;
+  await new Promise(r => setTimeout(r, delay));
+  showTyping();
+
+  const context = roadmapData
+    ? `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')}`
+    : '';
+
+  try {
+    const messages = [
+      ...chatHistory.slice(-8),
+    ];
+    const data = await callClaude(messages, 600, AYLENE_SYSTEM + context);
+    hideTyping();
+    const reply = data.content?.[0]?.text || "I'm having trouble right now. Try again in a moment.";
+    appendMsg('ai', reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    hideTyping();
+    appendMsg('ai', "Sorry, I'm having trouble connecting right now. Try again in a moment.");
+  }
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+}
+
+// ── RECORDS ──
+function handleFileSelect(e) {
+  Array.from(e.target.files).forEach(file => {
+    uploadedFiles.push({ file, id: Date.now() + Math.random() });
+    renderFiles();
+  });
+}
+
+function renderFiles() {
+  const list = document.getElementById('fileList');
+  if (!list) return;
+  list.innerHTML = uploadedFiles.map(f => {
+    const size = (f.file.size / 1024 / 1024).toFixed(1);
+    const icon = f.file.type.includes('pdf') ? '📄' : f.file.type.includes('image') ? '🖼️' : '📁';
+    return `<div class="file-item">
+      <div class="file-item-icon">${icon}</div>
+      <div style="flex:1"><div class="file-item-name">${f.file.name}</div><div class="file-item-size">${size} MB</div></div>
+      <span class="badge-ready">Ready</span>
+      <button class="btn-remove-file" onclick="removeFile('${f.id}')">✕</button>
+    </div>`;
   }).join('');
 }
 
-// =======================================================
-// VA REGULATIONS
-// =======================================================
-const REGS = {
-  "Service Connection": [
-    {
-      code: "38 CFR 3.303",
-      title: "Direct Service Connection",
-      html: `<div class="reg-intro">The foundational regulation for establishing that a current disability was caused by military service.</div>
-<h3>The Three-Element Test</h3>
-<p>To establish direct service connection, you must prove ALL three:</p>
-<div class="reg-list">
-  <div class="reg-item"><div class="reg-num">1</div><div><strong>Current Disability</strong> — A present medical diagnosis of the condition you're claiming.</div></div>
-  <div class="reg-item"><div class="reg-num">2</div><div><strong>In-Service Incurrence or Aggravation</strong> — Evidence that an event, injury, or disease occurred during active military service.</div></div>
-  <div class="reg-item"><div class="reg-num">3</div><div><strong>Nexus</strong> — A medical opinion stating it is "at least as likely as not" (50%+) that the current disability is related to the in-service event.</div></div>
-</div>
-<h3>Key Legal Points</h3>
-<ul class="reg-bullets">
-  <li><strong>"At least as likely as not"</strong> is a 50% standard — the benefit of the doubt goes to the veteran (38 CFR 3.102).</li>
-  <li>Absence of records does not equal no injury — many conditions go untreated in service.</li>
-  <li>A lay statement (your own testimony) can establish an in-service event when records don't exist.</li>
-</ul>`
-    },
-    {
-      code: "38 CFR 3.310",
-      title: "Secondary Service Connection",
-      html: `<div class="reg-intro">Allows you to claim a new condition that was caused OR aggravated by an already service-connected disability.</div>
-<h3>Common Secondary Chains</h3>
-<ul class="reg-bullets">
-  <li><strong>PTSD → Sleep Apnea</strong></li>
-  <li><strong>PTSD → Depression, Anxiety, Substance Use</strong></li>
-  <li><strong>Sleep Apnea → Hypertension, Heart Conditions</strong></li>
-  <li><strong>Knee/Hip/Ankle → Back conditions</strong> (altered gait)</li>
-  <li><strong>Diabetes (Type 2) → Neuropathy, Retinopathy, ED</strong></li>
-</ul>
-<h3>What You Need</h3>
-<p>A nexus letter from a physician stating the secondary condition is "at least as likely as not caused or aggravated by" the primary service-connected condition.</p>`
-    },
-    {
-      code: "38 CFR 3.307-309",
-      title: "Presumptive Conditions",
-      html: `<div class="reg-intro">Certain diseases are presumed to be service-connected — no nexus letter required.</div>
-<h3>PACT Act (2022)</h3>
-<p>Post-9/11 burn pit veterans: ALL cancers and several respiratory conditions are now presumptive if you served in a covered location (Iraq, Afghanistan, Southwest Asia) after August 2, 1990.</p>
-<h3>Agent Orange</h3>
-<p>Type 2 Diabetes, ischemic heart disease, Parkinson's, peripheral neuropathy, various cancers — presumptive for Vietnam/Korea DMZ veterans.</p>
-<h3>Gulf War Illness</h3>
-<p>Undiagnosed illnesses, chronic fatigue, fibromyalgia, functional GI disorders — presumptive under 38 CFR 3.317.</p>`
-    }
-  ],
-  "Rating & Compensation": [
-    {
-      code: "38 CFR Part 4",
-      title: "How the VA Rates Disabilities",
-      html: `<div class="reg-intro">The master rulebook for how VA assigns disability percentages.</div>
-<h3>C&P Exam Tip</h3>
-<p>Describe your <strong>worst days</strong>, not your average days. The examiner's written opinion largely determines your rating. Never minimize your symptoms.</p>
-<h3>Whole Person Combined Rating</h3>
-<p>Ratings don't add together. Each new rating applies to the remaining "able" percentage. 50% + 30% = 65%, which rounds to <strong>70%</strong>.</p>
-<h3>Bilateral Factor (38 CFR 4.68)</h3>
-<p>If you have service-connected disabilities affecting both arms OR both legs, a 10% bilateral factor is added before applying the combined ratings table.</p>`
-    },
-    {
-      code: "38 CFR 4.16",
-      title: "TDIU — Total Disability Individual Unemployability",
-      html: `<div class="reg-intro">Paid at the 100% rate when service-connected conditions prevent substantially gainful employment — even if your combined rating is below 100%.</div>
-<h3>Schedular TDIU — 4.16(a)</h3>
-<ul class="reg-bullets">
-  <li>ONE condition rated <strong>60%+</strong>, OR</li>
-  <li>Combined rating of <strong>70%+</strong> with at least one disability at 40%+</li>
-</ul>
-<h3>Extra-Schedular TDIU — 4.16(b)</h3>
-<p>Even without meeting the thresholds, VA must refer your case if conditions prevent employment.</p>
-<h3>Evidence Needed</h3>
-<p>VA Form 21-8940 + employment history showing job losses or inability to maintain employment.</p>`
-    }
-  ],
-  "Appeals (AMA)": [
-    {
-      code: "38 CFR 19-20",
-      title: "Your 3 Appeal Options",
-      html: `<div class="reg-intro">The Appeals Modernization Act (AMA) gives you three lanes after a denial.</div>
-<div class="reg-list">
-  <div class="reg-item"><div class="reg-num">1</div><div><strong>Supplemental Claim</strong> — New and relevant evidence. Best starting point. File VA Form 20-0995. Can be filed at any time — no deadline.</div></div>
-  <div class="reg-item"><div class="reg-num">2</div><div><strong>Higher-Level Review (HLR)</strong> — Senior reviewer, same evidence. Good for clear rater errors. File VA Form 20-0996.</div></div>
-  <div class="reg-item"><div class="reg-num">3</div><div><strong>BVA Appeal</strong> — Veterans Law Judge. Can submit new evidence. File VA Form 10182. After BVA, appeal to CAVC within 120 days.</div></div>
-</div>`
-    },
-    {
-      code: "38 CFR 3.400",
-      title: "Effective Dates",
-      html: `<div class="reg-intro">The date your VA benefits begin. Getting the earliest possible effective date means maximum retroactive back pay.</div>
-<h3>Intent to File (ITF)</h3>
-<p>File an Intent to File (VA Form 21-0966) BEFORE you're ready to submit your full claim. This locks in an effective date up to <strong>1 year in advance</strong>.</p>
-<h3>General Rule</h3>
-<p>The effective date is the <strong>date VA receives your claim</strong>, OR the date you become entitled to benefits — whichever is later.</p>`
-    }
-  ],
-  "PACT Act": [
-    {
-      code: "PL 117-168",
-      title: "PACT Act — Toxic Exposure Overview",
-      html: `<div class="reg-intro">The PACT Act of 2022 is the largest expansion of VA benefits in decades.</div>
-<h3>Who It Covers</h3>
-<ul class="reg-bullets">
-  <li>Post-9/11 veterans who served in Southwest Asia after August 2, 1990</li>
-  <li>Vietnam-era veterans with new cancers added to Agent Orange list</li>
-  <li>Cold War veterans who served at radiation-contaminated sites</li>
-</ul>
-<h3>All Cancers Are Now Presumptive</h3>
-<p>If you served in a covered location, no nexus letter is needed for any cancer claim.</p>
-<h3>Camp Lejeune</h3>
-<p>Veterans who lived/worked at Camp Lejeune for 30+ days from August 1953 to December 1987 are entitled to VA healthcare AND disability compensation for 15 qualifying conditions.</p>
-<h3>How to File</h3>
-<p>VA Form 21-526EZ — select "Yes" to toxic exposure and list your deployment locations.</p>`
-    }
-  ]
-};
-
-// =======================================================
-// REGULATIONS
-// =======================================================
-function buildRegsTree() {
-  const tree = document.getElementById('regsTree');
-  tree.innerHTML = '';
-  Object.entries(REGS).forEach(([sec, items], si) => {
-    const el = document.createElement('div');
-    el.innerHTML = `
-      <div class="tree-grp-hdr ${si===0?'open':''}" onclick="toggleTree(this)"><span class="tree-chevron">▶</span><span>${sec}</span></div>
-      <div class="tree-items ${si===0?'open':''}">
-        ${items.map((item,ii)=>`<div class="tree-item ${si===0&&ii===0?'active':''}" onclick="showReg('${sec}','${item.code}')">${item.title}<div class="tree-code">${item.code}</div></div>`).join('')}
-      </div>`;
-    tree.appendChild(el);
-  });
-  showReg('Service Connection', REGS['Service Connection'][0].code);
+function removeFile(id) {
+  uploadedFiles = uploadedFiles.filter(f => f.id != id);
+  renderFiles();
 }
 
-function toggleTree(hdr) { hdr.classList.toggle('open'); hdr.nextElementSibling.classList.toggle('open'); }
+// Drag-drop
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('uploadZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    Array.from(e.dataTransfer.files).forEach(file => {
+      uploadedFiles.push({ file, id: Date.now() + Math.random() });
+    });
+    renderFiles();
+  });
+});
 
-function showReg(sec, code) {
-  document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
-  const item = REGS[sec]?.find(i => i.code === code);
+// ── REGULATIONS ──
+const REGS = [
+  {
+    group: 'Service Connection',
+    items: [
+      { code: '38 CFR § 3.303', title: 'Direct Service Connection', content: `
+        <p class="reg-intro">Direct service connection means your condition was caused or aggravated by something that happened during your military service.</p>
+        <h3>The Three Elements</h3>
+        <div class="reg-list">
+          <div class="reg-item"><div class="reg-num">1</div><div>A current, diagnosed condition</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div>An in-service event, injury, or disease</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div>A medical nexus (link) between the two</div></div>
+        </div>
+        <h3>Important Points</h3>
+        <ul class="reg-bullets">
+          <li>You don't need a continuous chain of treatment records</li>
+          <li>A nexus letter from a private doctor can provide the medical link</li>
+          <li>Lay statements (yours and buddy statements) are valid evidence</li>
+          <li>The benefit of the doubt goes to the veteran when evidence is roughly equal</li>
+        </ul>` },
+      { code: '38 CFR § 3.310', title: 'Secondary Service Connection', content: `
+        <p class="reg-intro">A condition is secondary if it was caused or aggravated by a condition that is already service-connected.</p>
+        <h3>Two Types</h3>
+        <div class="reg-list">
+          <div class="reg-item"><div class="reg-num">1</div><div><strong>Causation:</strong> The service-connected condition directly caused the new condition</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div><strong>Aggravation:</strong> The service-connected condition worsened a pre-existing condition beyond its natural progression</div></div>
+        </div>
+        <h3>Common Secondary Claims</h3>
+        <ul class="reg-bullets">
+          <li>PTSD → Depression, Sleep Apnea, Substance Use</li>
+          <li>Knee injury → Hip / Back conditions</li>
+          <li>Diabetes → Peripheral neuropathy, eye conditions</li>
+          <li>Hypertension → Heart disease, erectile dysfunction</li>
+        </ul>` },
+      { code: '38 CFR § 3.307/3.309', title: 'Presumptive Service Connection', content: `
+        <p class="reg-intro">For certain conditions and service types, VA presumes service connection — you don't need to prove the link.</p>
+        <h3>Key Presumptive Categories</h3>
+        <ul class="reg-bullets">
+          <li><strong>PACT Act (2022):</strong> 23+ cancers and 11 respiratory conditions for burn pit veterans</li>
+          <li><strong>Agent Orange:</strong> 14 conditions for Vietnam-era veterans</li>
+          <li><strong>Gulf War Illness:</strong> Undiagnosed conditions for SWA veterans post-8/2/1990</li>
+          <li><strong>Camp Lejeune:</strong> 8 conditions for veterans who served 1953–1987</li>
+          <li><strong>ALS:</strong> Any veteran who served 90+ days active duty</li>
+        </ul>` },
+    ]
+  },
+  {
+    group: 'Rating Schedule',
+    items: [
+      { code: '38 CFR Part 4', title: 'VA Rating Schedule Overview', content: `
+        <p class="reg-intro">The VA rates disabilities on a scale of 0%, 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, or 100% based on the severity of symptoms.</p>
+        <h3>Key Principles</h3>
+        <ul class="reg-bullets">
+          <li>Ratings are based on average impairment in earning capacity, not your personal situation</li>
+          <li>The examiner uses a C&P exam to assess severity — your job is to describe your worst days</li>
+          <li>A 0% rating means service connection is granted but symptoms don't meet the minimum threshold</li>
+          <li>Combined ratings use the "VA math" whole-person method — never just add percentages</li>
+        </ul>
+        <h3>The Benefit of the Doubt Rule</h3>
+        <p>When evidence for and against a claim is approximately equal, VA must resolve the issue in your favor. This is one of the most important principles in VA law.</p>` },
+      { code: '38 CFR § 4.16', title: 'TDIU — Total Disability (Individual Unemployability)', content: `
+        <p class="reg-intro">TDIU allows you to receive 100% compensation even if your combined rating is below 100%, if your disabilities prevent substantially gainful employment.</p>
+        <h3>Eligibility Thresholds</h3>
+        <div class="reg-list">
+          <div class="reg-item"><div class="reg-num">1</div><div>Single disability rated at 60%+ (§ 4.16(a))</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div>Combined rating of 70%+ with at least one disability at 40% (§ 4.16(a))</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div>Extraschedular TDIU if you don't meet the above but are still unemployable (§ 4.16(b))</div></div>
+        </div>` },
+    ]
+  },
+  {
+    group: 'Claims Process',
+    items: [
+      { code: '38 CFR § 3.159', title: 'VA Duty to Assist', content: `
+        <p class="reg-intro">VA has a legal duty to help you develop your claim — including obtaining records and providing examinations.</p>
+        <h3>VA Must:</h3>
+        <ul class="reg-bullets">
+          <li>Request relevant records from federal agencies (STRs, SSA, etc.)</li>
+          <li>Request records from non-federal sources if you give authorization</li>
+          <li>Provide a medical examination (C&P exam) when it's needed to decide your claim</li>
+          <li>Notify you of what evidence is needed and give you time to submit it</li>
+        </ul>` },
+      { code: '38 CFR § 20.101', title: 'Appeals — Board of Veterans Appeals', content: `
+        <p class="reg-intro">If VA denies your claim or rates it too low, you have multiple appeal paths.</p>
+        <h3>Three Appeal Lanes</h3>
+        <div class="reg-list">
+          <div class="reg-item"><div class="reg-num">1</div><div><strong>Supplemental Claim:</strong> Submit new and relevant evidence. VA re-adjudicates.</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div><strong>Higher-Level Review:</strong> Senior reviewer looks for clear error in the original decision.</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div><strong>BVA Appeal:</strong> Board of Veterans Appeals. Choose direct review, evidence submission, or hearing.</div></div>
+        </div>` },
+    ]
+  }
+];
+
+function buildRegsTree() {
+  const tree = document.getElementById('regsTree');
+  if (!tree || tree.children.length > 0) return;
+  tree.innerHTML = REGS.map((grp, gi) => `
+    <div class="tree-grp-hdr ${gi===0?'open':''}" onclick="toggleTreeGroup(this)">
+      <span class="tree-chevron">▶</span> ${grp.group}
+    </div>
+    <div class="tree-items ${gi===0?'open':''}">
+      ${grp.items.map((item, ii) => `
+        <div class="tree-item" onclick="showReg(${gi},${ii})">${item.title}<div class="tree-code">${item.code}</div></div>
+      `).join('')}
+    </div>`).join('');
+}
+
+function toggleTreeGroup(hdr) {
+  hdr.classList.toggle('open');
+  hdr.nextElementSibling?.classList.toggle('open');
+}
+
+function showReg(gi, ii) {
+  document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
+  const grp = REGS[gi];
+  const item = grp?.items?.[ii];
   if (!item) return;
-  currentReg = item;
-  document.querySelectorAll('.tree-item').forEach(el => { if (el.querySelector('.tree-code')?.textContent===code) el.classList.add('active'); });
+  document.querySelectorAll('.tree-item')[gi * 10 + ii]?.classList.add('active');
   document.getElementById('regsTitle').textContent = item.title;
-  document.getElementById('regsCode').textContent = item.code + ' — ' + sec;
-  document.getElementById('regsBody').innerHTML = item.html;
+  document.getElementById('regsCode').textContent = item.code;
+  document.getElementById('regsBody').innerHTML = item.content;
 }
 
 function filterRegs(q) {
-  q = q.toLowerCase();
-  document.querySelectorAll('.tree-item').forEach(el => { el.style.display = !q || el.textContent.toLowerCase().includes(q) ? 'flex' : 'none'; });
-}
-
-async function askRegsAI() {
-  const input = document.getElementById('regsInput');
-  const btn   = document.getElementById('regsBtn');
-  const q     = input.value.trim();
-  if (!q) return;
-  btn.disabled=true; btn.textContent='...';
-  const ctx = currentReg ? `Veteran is reading: ${currentReg.title} (${currentReg.code}). ` : '';
-  try {
-    const resp = await callClaude([{role:'user',content:ctx+'Question: '+q}], buildSystemPrompt());
-    const body = document.getElementById('regsBody');
-    const block = document.createElement('div');
-    block.style.cssText = 'background:var(--blue-pale);border:1px solid var(--blue-light);border-radius:var(--r);padding:13px;margin-top:14px;';
-    block.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:7px;">🤖 "${q}"</div><div style="font-size:13px;line-height:1.7;">${fmt(resp)}</div>`;
-    body.appendChild(block); body.scrollTop=body.scrollHeight; input.value='';
-  } catch(e) { alert('Error: '+e.message); }
-  btn.disabled=false; btn.textContent='Ask AI';
-}
-
-// =======================================================
-// CLAUDE API
-// =======================================================
-async function callClaude(messages, system, maxTokens=450) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':API_KEY,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:maxTokens,
-      system:system||buildSystemPrompt(),
-      messages:messages.slice(-20)
-    })
+  const lower = q.toLowerCase();
+  document.querySelectorAll('.tree-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(lower) ? '' : 'none';
   });
-  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${r.status}`); }
-  const d = await r.json();
-  return d.content[0]?.text || 'No response.';
 }
 
-// =======================================================
-// INIT
-// =======================================================
-renderTracker();
-document.querySelectorAll('.m-overlay').forEach(o => o.addEventListener('click', e => { if (e.target===o) o.classList.remove('active'); }));
-['dlUploadZone','medUploadZone'].forEach(id => {
-  const z = document.getElementById(id);
-  if (!z) return;
-  z.addEventListener('dragover', e => { e.preventDefault(); z.style.borderColor='var(--blue-mid)'; });
-  z.addEventListener('dragleave', () => z.style.borderColor='');
-  z.addEventListener('drop', e => { e.preventDefault(); z.style.borderColor=''; (id==='dlUploadZone'?handleDLUpload:handleMedUpload)(e.dataTransfer.files); });
-});
+async function askAboutReg() {
+  const input = document.getElementById('regsAskInput');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  const title = document.getElementById('regsTitle').textContent;
+  showPage('chat');
+  if (chatHistory.length === 0) initChat();
+  setTimeout(() => {
+    document.getElementById('chatInput').value = `About ${title}: ${question}`;
+    sendMessage();
+  }, 500);
+}
 
-// DEV STATUS BAR
-(async function checkDevStatus() {
-  const appEl = document.getElementById('devAppStatus');
-  const apiEl = document.getElementById('devApiStatus');
-  if (!appEl || !apiEl) return;
-
-  appEl.textContent = '✅ App online';
-  appEl.style.color = '#66bb6a';
-
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 10,
-        messages: [{role:'user', content:'hi'}]
-      })
-    });
-    if (r.ok || r.status === 400) {
-      apiEl.textContent = '✅ AI online';
-      apiEl.style.color = '#66bb6a';
-    } else if (r.status === 401) {
-      apiEl.textContent = '❌ API key invalid';
-      apiEl.style.color = '#ef5350';
-    } else {
-      apiEl.textContent = '⚠️ AI status unknown';
-    }
-  } catch(e) {
-    apiEl.textContent = '❌ AI unreachable';
-    apiEl.style.color = '#ef5350';
-  }
-})();
+// ── CLAUDE API ──
+async function callClaude(messages, maxTokens = 1000, system = '') {
+  const body = { model: CLAUDE_MODEL, max_tokens: maxTokens, messages };
+  if (system) body.system = system;
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CLAUDE_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
+  return await res.json();
+}
