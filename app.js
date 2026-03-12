@@ -663,61 +663,26 @@ async function buildRoadmap() {
     if (step > loadingSteps.length) clearInterval(stepInterval);
   }, 1800);
 
-  const prompt = `You are a VA disability claims expert. Build a comprehensive claim roadmap for this veteran.
+  const mosLabel = ans.mos?.label || ans.mos?.title || '';
+  const teraFlag = ans.mos?.tera ? ' [TERA ELIGIBLE]' : '';
+  const prompt = `VA disability expert. Build a claim roadmap. Return ONLY valid JSON, no markdown.
 
-VETERAN PROFILE:
-- Goal: ${ans.goal}
-- Branch: ${ans.branch?.join(', ')}
-- Component: ${ans.component}
-- Service Dates: ${ans.startYear||'?'}–${ans.endYear||'?'}
-- Discharge: ${ans.discharge}
-- MOS/Rate: ${ans.mos?.code||'?'} ${ans.mos?.title||''}
-- Deployments: ${ans.deployments?.join(', ')||'None listed'}
-- Toxic Exposures: ${ans.exposures?.join(', ')||'None listed'}
-- Current VA Status: ${ans.vaStatus}
-- Already Rated: ${ans.ratedConds?.join(', ')||'None'}
-- Reported Symptoms: ${ans.symptoms?.join(', ')||'None'}
-- Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
-- In-Service Events: ${ans.events?.join(', ')||'None'}
-- Evidence on Hand: ${ans.evidence?.join(', ')||'None'}
-- Life Impact: ${ans.impact?.join(', ')||'Not specified'}
-- Follow-up answers: ${JSON.stringify(ans.followups||{})}
+VETERAN: ${ans.branch?.join('/')} ${ans.component} | MOS ${ans.mos?.code||'?'} ${mosLabel}${teraFlag}
+Service: ${ans.startYear}-${ans.endYear} | Discharge: ${ans.discharge}
+Deployments: ${ans.deployments?.join(', ')||'None'} | Exposures: ${ans.exposures?.join(', ')||'None'}
+VA Status: ${ans.vaStatus} | Rated: ${ans.ratedConds?.join(', ')||'None'}
+Symptoms: ${ans.symptoms?.join(', ')||'None'}
+Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
+Events: ${ans.events?.join(', ')||'None'}
+Evidence: ${ans.evidence?.join(', ')||'None'}
 
-Generate a JSON roadmap in this exact format:
-{
-  "summary": "2-3 sentence personalized summary of this veteran's claim outlook",
-  "totalConditions": number,
-  "priority": "direct|secondary|presumptive",
-  "conditions": [
-    {
-      "name": "Condition name",
-      "type": "direct|secondary|presumptive|lay",
-      "priority": "high|medium|low",
-      "nexus": "Specific explanation of how this connects to service",
-      "evidence_have": "What they already have",
-      "evidence_need": "What they still need",
-      "action": "Specific next step",
-      "secondaryTo": "Condition name (only for secondary)",
-      "cfr": "38 CFR Part 4 diagnostic code if applicable",
-      "ratingCriteria": [
-        {"pct": 10, "desc": "Plain-language description of what 10% looks like"},
-        {"pct": 30, "desc": "..."},
-        {"pct": 50, "desc": "..."},
-        {"pct": 70, "desc": "...if applicable"}
-      ],
-      "checks": ["Action step 1", "Action step 2", "Action step 3"]
-    }
-  ],
-  "tdiu": boolean,
-  "tdiu_note": "explanation if tdiu applies",
-  "pact_note": "PACT Act note if relevant",
-  "top_action": "The single most important thing this veteran should do right now"
-}
+JSON format:
+{"summary":"2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","nexus":"","evidence_have":"","evidence_need":"","action":"","secondaryTo":"","cfr":"","ratingCriteria":[{"pct":10,"desc":""},{"pct":30,"desc":""},{"pct":50,"desc":""}],"checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":""}
 
-Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific to their MOS and exposures. Return ONLY valid JSON.`;
+Rules: 3-5 conditions max. Specific to their MOS/exposures. High-value winnable claims only.`;
 
   try {
-    const data = await callClaude([{role:'user',content:prompt}], 4000);
+    const data = await callClaude([{role:'user',content:prompt}], 1500);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -752,7 +717,7 @@ Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific t
     clearInterval(stepInterval);
     console.error('Roadmap error:', e);
     roadmapData = {
-      summary: `There was an error generating your roadmap: ${e.message}. Please try again — this is usually a temporary API issue.`,
+      summary: `Error: ${e.message}. ${e.message.includes('rate') ? 'Our AI is briefly busy — please click "Retry Roadmap" below in ~30 seconds.' : 'Please try again.'}`,
       conditions: [], error: e.message, totalConditions: 0
     };
     showView('vApp');
@@ -782,6 +747,20 @@ function renderRoadmap(data) {
   const high = data.conditions.filter(c=>c.priority==='high');
   const mid = data.conditions.filter(c=>c.priority==='medium');
   const low = data.conditions.filter(c=>c.priority==='low'||!c.priority);
+
+  // Show error state with retry button
+  if (data.error && data.conditions.length === 0) {
+    el.innerHTML = `
+      <div class="rm-hero rm-hero-error">
+        <div style="font-size:40px">⚠️</div>
+        <div>
+          <div class="rm-hero-tag" style="color:var(--gold)">Generation Error</div>
+          <div class="rm-hero-title" style="font-size:20px">${data.summary}</div>
+          <button class="btn btn-primary" style="margin-top:16px" onclick="buildRoadmap()">↻ Retry Roadmap</button>
+        </div>
+      </div>`;
+    return;
+  }
 
   let html = `
     <div class="rm-hero">
@@ -1494,19 +1473,37 @@ async function askAboutReg() {
 }
 
 // ── CLAUDE API ──
-async function callClaude(messages, maxTokens = 1000, system = '') {
-  const body = { model: CLAUDE_MODEL, max_tokens: maxTokens, messages };
+async function callClaude(messages, maxTokens = 800, system = '', retries = 2) {
+  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 1500), messages };
   if (system) body.system = system;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
-  return await res.json();
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify(body)
+      });
+      if (res.status === 429) {
+        // Rate limited — wait and retry
+        const wait = (attempt + 1) * 15000; // 15s, 30s
+        console.warn(`Rate limited. Waiting ${wait/1000}s before retry ${attempt+1}/${retries}...`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(`Claude API error: ${res.status} — ${errData?.error?.message || ''}`);
+      }
+      return await res.json();
+    } catch(e) {
+      if (attempt >= retries) throw e;
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+  throw new Error('Max retries exceeded');
 }
