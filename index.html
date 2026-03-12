@@ -93,8 +93,14 @@
     <div class="l-section-inner">
       <div class="l-section-tag">VA Compensation</div>
       <div class="l-section-title">See What You Could Be Receiving</div>
-      <div class="l-section-sub">2025 VA monthly compensation rates — tax free, federal and state.</div>
-      <div class="calc-widget">
+      <div class="l-section-sub">2025 VA monthly compensation rates — tax free. Use the combined rating calculator to see how multiple conditions add up using the official VA whole-person method.</div>
+      <div class="calc-tabs">
+        <div class="calc-tab active" id="ctab-single" onclick="switchCalcTab('single')">Monthly Rate Lookup</div>
+        <div class="calc-tab" id="ctab-multi" onclick="switchCalcTab('multi')">Combined Rating Calculator</div>
+      </div>
+
+      <!-- SINGLE RATING -->
+      <div class="calc-widget" id="calcSingle">
         <div class="calc-row">
           <div>
             <div class="calc-label">Disability Rating</div>
@@ -131,6 +137,18 @@
           </div>
         </div>
         <p class="calc-note">Rates shown are 2025 VA compensation. Verify current rates at <a href="https://www.va.gov/disability/compensation-rates/" target="_blank">VA.gov</a>.</p>
+      </div>
+
+      <!-- COMBINED RATING CALCULATOR -->
+      <div class="calc-widget" id="calcMulti" style="display:none">
+        <div class="calc-multi-info">⚙️ <strong>How VA math works:</strong> VA does NOT add percentages. Each condition is applied to your remaining "whole person." A veteran with 50% PTSD and 30% back — VA math gives 65%, not 80%.</div>
+        <div id="multiRatingInputs">
+          <div class="multi-rating-row"><input class="multi-rating-input calc-select" type="number" min="0" max="100" placeholder="Rating %" oninput="updateMultiCalc()"><span class="multi-rating-label">Condition 1</span><button class="btn-remove-rating" onclick="removeRatingRow(this)">✕</button></div>
+          <div class="multi-rating-row"><input class="multi-rating-input calc-select" type="number" min="0" max="100" placeholder="Rating %" oninput="updateMultiCalc()"><span class="multi-rating-label">Condition 2</span><button class="btn-remove-rating" onclick="removeRatingRow(this)">✕</button></div>
+        </div>
+        <button class="btn-add-rating" onclick="addRatingRow()">＋ Add Condition</button>
+        <div id="multiCalcResult"></div>
+        <p class="calc-note">This is the official VA whole-person combined rating formula per 38 CFR Part 4.</p>
       </div>
     </div>
   </section>
@@ -289,7 +307,7 @@
             <label class="auth-label">Birth Year</label>
             <select class="auth-input" id="authBirthYear">
               <option value="">Year...</option>
-              ${Array.from({length:80},(_,i)=>2005-i).map(y=>`<option value="${y}">${y}</option>`).join('')}
+              <option value="1944">1944</option><option value="1945">1945</option><option value="1946">1946</option><option value="1947">1947</option><option value="1948">1948</option><option value="1949">1949</option><option value="1950">1950</option><option value="1951">1951</option><option value="1952">1952</option><option value="1953">1953</option><option value="1954">1954</option><option value="1955">1955</option><option value="1956">1956</option><option value="1957">1957</option><option value="1958">1958</option><option value="1959">1959</option><option value="1960">1960</option><option value="1961">1961</option><option value="1962">1962</option><option value="1963">1963</option><option value="1964">1964</option><option value="1965">1965</option><option value="1966">1966</option><option value="1967">1967</option><option value="1968">1968</option><option value="1969">1969</option><option value="1970">1970</option><option value="1971">1971</option><option value="1972">1972</option><option value="1973">1973</option><option value="1974">1974</option><option value="1975">1975</option><option value="1976">1976</option><option value="1977">1977</option><option value="1978">1978</option><option value="1979">1979</option><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option><option value="1991">1991</option><option value="1992">1992</option><option value="1993">1993</option><option value="1994">1994</option><option value="1995">1995</option><option value="1996">1996</option><option value="1997">1997</option><option value="1998">1998</option><option value="1999">1999</option><option value="2000">2000</option><option value="2001">2001</option><option value="2002">2002</option><option value="2003">2003</option><option value="2004">2004</option><option value="2005">2005</option>
             </select>
           </div>
         </div>
@@ -725,10 +743,52 @@
     <div class="m-body">
       <div class="f-group"><label class="f-label">Condition Name</label><input class="f-input" id="addCondName" placeholder="e.g., Tinnitus, PTSD, Lumbar strain..."></div>
       <div class="f-row">
-        <div class="f-group"><label class="f-label">Basis</label><select class="f-select" id="addCondBasis"><option value="direct">Direct</option><option value="secondary">Secondary</option><option value="presumptive">Presumptive</option></select></div>
-        <div class="f-group"><label class="f-label">Status</label><select class="f-select" id="addCondStatus"><option value="todo">To Do</option><option value="inprog">In Progress</option><option value="filed">Filed</option><option value="won">Won</option></select></div>
+        <div class="f-group"><label class="f-label">Claim Basis</label>
+          <select class="f-select" id="addCondBasis" onchange="toggleSecondaryField(this.value)">
+            <option value="direct">Direct Service</option>
+            <option value="secondary">Secondary to another condition</option>
+            <option value="presumptive">Presumptive (PACT Act / exposure)</option>
+            <option value="lay">Lay Evidence Only</option>
+          </select>
+        </div>
+        <div class="f-group"><label class="f-label">Claim Status</label>
+          <select class="f-select" id="addCondStatus">
+            <option value="todo">To Do</option>
+            <option value="inprog">In Progress</option>
+            <option value="filed">Filed</option>
+            <option value="won">Won</option>
+          </select>
+        </div>
       </div>
-      <div class="f-group"><label class="f-label">Notes</label><textarea class="f-textarea" id="addCondNotes" placeholder="Any relevant notes..."></textarea></div>
+      <div class="f-group" id="secondaryToField" style="display:none">
+        <label class="f-label">Secondary To <span style="color:var(--text-hint);font-weight:400">(which rated condition causes this?)</span></label>
+        <input class="f-input" id="addCondSecondaryTo" placeholder="e.g., PTSD, Lumbar strain, TBI...">
+      </div>
+      <div class="f-row">
+        <div class="f-group">
+          <label class="f-label">Current VA Rating <span style="color:var(--text-hint);font-weight:400">(if already rated)</span></label>
+          <select class="f-select" id="addCondRating">
+            <option value="0">Not rated / 0%</option>
+            <option value="10">10%</option><option value="20">20%</option>
+            <option value="30">30%</option><option value="40">40%</option>
+            <option value="50">50%</option><option value="60">60%</option>
+            <option value="70">70%</option><option value="80">80%</option>
+            <option value="90">90%</option><option value="100">100%</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">Target Rating <span style="color:var(--text-hint);font-weight:400">(what you're pursuing)</span></label>
+          <select class="f-select" id="addCondTargetRating">
+            <option value="0">Unknown / TBD</option>
+            <option value="10">10%</option><option value="20">20%</option>
+            <option value="30">30%</option><option value="40">40%</option>
+            <option value="50">50%</option><option value="60">60%</option>
+            <option value="70">70%</option><option value="80">80%</option>
+            <option value="90">90%</option><option value="100">100%</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-group"><label class="f-label">Notes</label><textarea class="f-textarea" id="addCondNotes" placeholder="Any relevant notes, nexus details, or evidence you have..."></textarea></div>
     </div>
     <div class="m-foot">
       <button class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
