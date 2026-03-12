@@ -550,6 +550,7 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
    AUTH MODAL ENHANCEMENTS
 ───────────────────────────────────────────────────── */
 .auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);overflow-y:auto;padding:20px;}
+#privacyModal{z-index:1100;}
 .auth-overlay.active{display:flex;}
 .auth-modal{background:white;border-radius:12px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;max-height:90vh;overflow-y:auto;}
 .auth-close-btn{position:absolute;top:14px;right:14px;background:none;border:none;font-size:18px;color:var(--text-hint);cursor:pointer;z-index:1;padding:4px 8px;border-radius:4px;}
@@ -642,3 +643,45 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .dash-stats-row{display:flex;gap:24px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);}
 .dash-stat-val{font-family:var(--font-display);font-size:24px;font-weight:700;color:white;}
 .dash-stat-lbl{font-size:11px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── CALC TABS & MULTI CALC ── */
+.calc-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:2px solid rgba(255,255,255,.15);}
+.calc-tab{padding:10px 20px;font-size:13px;font-weight:600;color:rgba(255,255,255,.55);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s;}
+.calc-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.calc-multi-info{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:12px 14px;font-size:13px;color:rgba(255,255,255,.8);margin-bottom:16px;line-height:1.6;}
+.multi-rating-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.multi-rating-input{width:100px!important;text-align:center;}
+.multi-rating-label{font-size:13px;color:rgba(255,255,255,.7);flex:1;}
+.btn-remove-rating{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.5);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;}
+.btn-remove-rating:hover{border-color:rgba(255,100,100,.5);color:#fca5a5;}
+.btn-add-rating{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:16px;}
+.btn-add-rating:hover{background:rgba(255,255,255,.15);}
+.calc-steps-wrap{margin-bottom:12px;}
+.calc-step{font-size:13px;color:rgba(255,255,255,.75);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+.calc-step-num{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gold);letter-spacing:.5px;margin-right:6px;}
+.calc-combined-result{background:rgba(255,255,255,.08);border-radius:6px;padding:14px;font-size:14px;color:rgba(255,255,255,.8);display:flex;flex-direction:column;gap:6px;}
+.calc-final{font-size:22px;color:var(--gold);font-family:var(--font-display);}
+.calc-note-100{color:#86efac;font-weight:700;}
+
+/* ── FILE MANAGER ── */
+.file-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:.15s;}
+.file-item:hover{border-color:var(--sky);box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.file-item-icon{font-size:22px;flex-shrink:0;}
+.file-item-name-wrap{display:flex;align-items:center;gap:6px;}
+.file-item-name{font-size:14px;font-weight:500;color:var(--text);}
+.file-item-meta{font-size:11px;color:var(--text-hint);margin-top:2px;}
+.btn-rename{background:none;border:none;font-size:13px;cursor:pointer;color:var(--text-hint);padding:2px 4px;border-radius:3px;opacity:0;}
+.file-item:hover .btn-rename{opacity:1;}
+.btn-rename:hover{background:var(--gray-100);color:var(--text);}
+.file-rename-input{font-size:14px;font-weight:500;border:1px solid var(--sky);border-radius:4px;padding:2px 8px;outline:none;color:var(--text);width:240px;}
+.btn-analyze-file{background:var(--sky-pale);border:1px solid #bfdbfe;color:var(--blue);font-size:12px;font-weight:600;padding:5px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;}
+.btn-analyze-file:hover{background:#dbeafe;}
+.btn-remove-file{background:none;border:none;color:var(--text-hint);font-size:16px;cursor:pointer;padding:4px;border-radius:4px;}
+.btn-remove-file:hover{background:var(--red-light);color:var(--red);}
+.badge-ready{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--green-light);color:var(--green);white-space:nowrap;}
+
+/* ── TRACKER TABLE ── */
+.cond-table{width:100%;border-collapse:collapse;font-size:13px;}
+.cond-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);background:var(--gray-50);}
+.cond-table td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.cond-table tr:hover td{background:var(--gray-50);}
