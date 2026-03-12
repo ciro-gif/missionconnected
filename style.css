@@ -31,6 +31,7 @@
 html{scroll-behavior:smooth;}
 body{font-family:var(--font-body);background:var(--white);color:var(--text);line-height:1.6;font-size:15px;-webkit-font-smoothing:antialiased;}
 .view{display:none;}.view.active{display:block;}
+#vApp.active{display:flex;flex-direction:column;height:100vh;}
 .no-print{}
 @media print{.no-print{display:none!important;}}
 
@@ -235,7 +236,7 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .loading-step.done{color:var(--green);opacity:.8;}
 
 /* ═══════════════════ APP SHELL ═══════════════════ */
-#vApp{display:flex;flex-direction:column;height:100vh;}
+#vApp{flex-direction:column;height:100vh;}
 .a-topbar{background:var(--navy);height:56px;display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;border-bottom:2px solid var(--gold);z-index:50;}
 .a-tb-logo{display:flex;align-items:center;gap:10px;cursor:pointer;}
 .a-tb-badge{background:var(--gold);color:var(--navy);font-family:var(--font-display);font-weight:700;font-size:12px;width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;}
