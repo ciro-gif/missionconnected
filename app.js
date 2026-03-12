@@ -24,6 +24,8 @@ let uploadedFiles = [];
 let authMode = 'signin';
 let activityLog = [];
 let undoStack = [];
+let notesData = { main: '', event: '', impact: '', treatment: '', priority: '' };
+let networkOk = null;
 
 // Screener answers
 const ans = {
@@ -54,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   buildRegsTree();
   renderAyleneAvatar();
   checkAuthState();
+  setTimeout(checkNetworkStatus, 2000); // Check after page loads
 });
 
 async function checkAuthState() {
@@ -64,6 +67,153 @@ async function checkAuthState() {
     if (session?.user) setUser(session.user);
     else { currentUser = null; updateTopbar(); }
   });
+}
+
+// ── NETWORK STATUS ──
+async function checkNetworkStatus() {
+  const dot = document.getElementById('netDot');
+  const label = document.getElementById('netLabel');
+  if (!dot || !label) return;
+  dot.style.background = '#F59E0B';
+  label.textContent = 'Checking...';
+  try {
+    // Ping Claude API with minimal request
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{role:'user',content:'hi'}] })
+    });
+    networkOk = res.ok || res.status === 529; // 529 = overloaded but reachable
+    const sbOk = !!sbClient;
+    if (res.ok) {
+      dot.style.background = '#16A34A'; label.textContent = 'All Systems Online';
+    } else if (res.status === 429) {
+      dot.style.background = '#F59E0B'; label.textContent = 'AI Rate Limited';
+    } else if (res.status === 529) {
+      dot.style.background = '#F59E0B'; label.textContent = 'AI Overloaded';
+    } else {
+      dot.style.background = '#DC2626'; label.textContent = 'AI Offline';
+    }
+    if (!sbOk) { dot.style.background = '#F59E0B'; label.textContent = 'DB Offline'; }
+  } catch(e) {
+    dot.style.background = '#DC2626'; label.textContent = 'Network Error';
+  }
+}
+
+// ── NOTES ──
+function saveNotes() {
+  notesData = {
+    main: document.getElementById('notesMain')?.value || '',
+    event: document.getElementById('nq-event')?.value || '',
+    impact: document.getElementById('nq-impact')?.value || '',
+    treatment: document.getElementById('nq-treatment')?.value || '',
+    priority: document.getElementById('nq-priority')?.value || ''
+  };
+  // Save to localStorage for non-auth users, Supabase for auth
+  try { localStorage.setItem('mc_notes', JSON.stringify(notesData)); } catch(e) {}
+  if (currentUser && sbClient) {
+    sbClient.from('profiles').upsert({ id: currentUser.id, notes: notesData }).catch(e => console.warn('Notes save:', e));
+  }
+  logActivity('notes_saved', '📝 Notes updated');
+  const msg = document.getElementById('notesSaveMsg');
+  if (msg) { msg.style.display = 'flex'; setTimeout(() => msg.style.display='none', 2500); }
+}
+
+function loadNotes() {
+  try {
+    const saved = localStorage.getItem('mc_notes');
+    if (saved) notesData = JSON.parse(saved);
+  } catch(e) {}
+  const ids = { main:'notesMain', event:'nq-event', impact:'nq-impact', treatment:'nq-treatment', priority:'nq-priority' };
+  Object.entries(ids).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el && notesData[key]) el.value = notesData[key];
+  });
+}
+
+// ── CONTACT MODAL ──
+let currentContactType = null;
+function openContactModal() {
+  showContactOptions();
+  document.getElementById('contactModal')?.classList.add('active');
+}
+
+function showContactOptions() {
+  currentContactType = null;
+  document.getElementById('contactOptions').style.display = 'block';
+  document.getElementById('contactTechForm').style.display = 'none';
+  document.getElementById('contactVSOForm').style.display = 'none';
+  document.getElementById('contactSubmitBtn').style.display = 'none';
+}
+
+function showContactForm(type) {
+  currentContactType = type;
+  document.getElementById('contactOptions').style.display = 'none';
+  document.getElementById('contactTechForm').style.display = type === 'tech' ? 'block' : 'none';
+  document.getElementById('contactVSOForm').style.display = type === 'vso' ? 'block' : 'none';
+  document.getElementById('contactSubmitBtn').style.display = 'block';
+  // Pre-fill email/name if signed in
+  if (currentUser) {
+    const name = currentUser.user_metadata?.full_name || '';
+    const email = currentUser.email || '';
+    if (type === 'tech') {
+      document.getElementById('ctName').value = name;
+      document.getElementById('ctEmail').value = email;
+    } else {
+      document.getElementById('cvName').value = name;
+    }
+  }
+}
+
+function submitContactForm() {
+  if (currentContactType === 'tech') {
+    const name = document.getElementById('ctName').value.trim();
+    const email = document.getElementById('ctEmail').value.trim();
+    const issue = document.getElementById('ctIssue').value.trim();
+    if (!email || !issue) { alert('Please fill in your email and describe the issue.'); return; }
+    window.open(`mailto:hello@missionconnected.vet?subject=Tech Support: Mission Connected&body=Name: ${name}%0AEmail: ${email}%0A%0AIssue:%0A${issue}`, '_blank');
+  } else if (currentContactType === 'vso') {
+    const name = document.getElementById('cvName').value.trim();
+    const phone = document.getElementById('cvPhone').value.trim();
+    const need = document.getElementById('cvNeed').value.trim();
+    const auth = document.getElementById('cvAuthorize').checked;
+    if (!name || !phone || !need) { alert('Please fill in your name, phone, and describe what you need.'); return; }
+    const roadmapSnap = auth && roadmapData ? `\n\nRoadmap Summary (authorized): ${roadmapData.summary || 'See attached'}` : '';
+    window.open(`mailto:vso@missionconnected.vet?subject=VSO Referral Request&body=Name: ${name}%0APhone: ${phone}%0ANeeds: ${need}${roadmapSnap ? encodeURIComponent(roadmapSnap) : ''}`, '_blank');
+  }
+  closeModal('contactModal');
+  logActivity('contact_submitted', `📞 Help request submitted (${currentContactType})`);
+}
+
+// ── PERMANENT ERASE ──
+async function confirmPermanentErase() {
+  const confirmed = confirm('⚠️ PERMANENT ACTION — This cannot be undone.\n\nThis will immediately delete:\n• Your account\n• Your roadmap and all conditions\n• All uploaded records\n• All notes\n\nType "ERASE" to confirm.');
+  if (!confirmed) return;
+  const word = prompt('Type ERASE to confirm permanent deletion:');
+  if (word !== 'ERASE') { alert('Deletion cancelled.'); return; }
+  // Clear local data
+  uploadedFiles = [];
+  conditions = [];
+  roadmapData = null;
+  chatHistory = [];
+  notesData = {};
+  activityLog = [];
+  try { localStorage.removeItem('mc_notes'); } catch(e) {}
+  // Delete from Supabase
+  if (sbClient && currentUser) {
+    try {
+      await sbClient.from('claims').delete().eq('user_id', currentUser.id);
+      await sbClient.from('profiles').delete().eq('id', currentUser.id);
+      await sbClient.storage.from('documents').list(currentUser.id).then(async ({ data }) => {
+        if (data?.length) await sbClient.storage.from('documents').remove(data.map(f => `${currentUser.id}/${f.name}`));
+      });
+      await sbClient.auth.signOut();
+    } catch(e) { console.warn('Erase error:', e); }
+  }
+  currentUser = null;
+  updateTopbar();
+  showView('vLanding');
+  alert('✅ All your data has been permanently erased. Thank you for using Mission: Connected.');
 }
 
 function setUser(user) {
@@ -196,6 +346,7 @@ function showPage(id) {
   if (id === 'tracker') renderTrackerTable();
   if (id === 'activity') renderActivityLog();
   if (id === 'profile') renderProfile();
+  if (id === 'notes') { loadNotes(); }
 }
 
 // ── ACTIVITY LOG ──
@@ -871,10 +1022,17 @@ function renderDashboard() {
   if (!conditions.length) { el.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">📊</div>Complete your screener to activate your dashboard.</div>'; return; }
 
   const branch = ans.branch?.[0] || 'Unknown';
-  const mos = ans.mos?.title || 'Unknown MOS';
+  const mos = ans.mos?.label || ans.mos?.title || 'Unknown MOS';
   const start = ans.startYear || '?';
   const end = ans.endYear || 'Present';
-  const estimated = Math.min(conditions.length * 12, 90);
+
+  // Real VA math: current = won conditions with ratings, potential = all at target ratings
+  const wonRatings = conditions.filter(c => c.col === 'won' && c.rating > 0).map(c => c.rating);
+  const allTargetRatings = conditions.map(c => c.targetRating || c.rating || 10).filter(r => r > 0);
+  const currentCombined = wonRatings.length ? vaWholePerson(wonRatings) : 0;
+  const potentialCombined = allTargetRatings.length ? vaWholePerson(allTargetRatings) : 0;
+  const pendingCount = conditions.filter(c => c.col === 'todo' || c.col === 'inprog').length;
+  const wonCount = conditions.filter(c => c.col === 'won').length;
 
   let html = `
   <div class="dash-hero">
@@ -887,26 +1045,32 @@ function renderDashboard() {
     </div>
     <div class="dash-stats-row">
       <div><div class="dash-stat-val">${conditions.length}</div><div class="dash-stat-lbl">Conditions</div></div>
-      <div><div class="dash-stat-val">${conditions.filter(c=>c.col==='won').length}</div><div class="dash-stat-lbl">Won</div></div>
-      <div><div class="dash-stat-val">${estimated}%</div><div class="dash-stat-lbl">Est. Max Rating</div></div>
+      <div><div class="dash-stat-val">${wonCount}</div><div class="dash-stat-lbl">Won</div></div>
+      <div><div class="dash-stat-val">${pendingCount}</div><div class="dash-stat-lbl">Pending</div></div>
+      <div><div class="dash-stat-val">${currentCombined}%</div><div class="dash-stat-lbl">Current Rating</div></div>
     </div>
   </div>
 
   <div class="gauge-section">
     <div class="gauge-card">
-      <div class="gauge-title">Combined Rating Potential</div>
+      <div class="gauge-title">Combined Rating</div>
       <div class="gauge-wrap">
         <svg class="gauge-svg" viewBox="0 0 200 110">
           <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#E5E7EB" stroke-width="18" stroke-linecap="round"/>
           <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#002855" stroke-width="18" stroke-linecap="round"
-            stroke-dasharray="${Math.PI * 90 * estimated / 100} ${Math.PI * 90}" />
-          <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#C9A84C" stroke-width="18" stroke-linecap="round" stroke-opacity="0.25"/>
+            stroke-dasharray="${Math.PI * 90 * currentCombined / 100} ${Math.PI * 90}" />
+          <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#C9A84C" stroke-width="18" stroke-linecap="round" stroke-opacity="0.35"
+            stroke-dasharray="${Math.PI * 90 * potentialCombined / 100} ${Math.PI * 90}" />
         </svg>
-        <div class="gauge-center-val"><div class="gauge-pct">${estimated}%</div><div class="gauge-pct-label">Estimated</div></div>
+        <div class="gauge-center-val"><div class="gauge-pct">${currentCombined}%</div><div class="gauge-pct-label">Current</div></div>
       </div>
       <div class="gauge-legend">
-        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#002855"></div>Current</div>
-        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#C9A84C"></div>Potential</div>
+        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#002855"></div>Current (won)</div>
+        <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#C9A84C"></div>Potential ${potentialCombined}%</div>
+      </div>
+      <div class="gauge-note">
+        ${currentCombined === 0 && wonCount === 0 ? '⏳ No conditions won yet — current rating is 0%. Conditions in the "Won" column with ratings update this gauge.' : ''}
+        ${potentialCombined > 0 ? `📊 If all ${conditions.length} conditions reach target ratings, VA combined math yields <strong>${potentialCombined}%</strong>` : ''}
       </div>
     </div>
     <div class="service-profile">
@@ -914,7 +1078,7 @@ function renderDashboard() {
       <div class="sp-grid">
         <div class="sp-item"><div class="sp-item-label">Branch</div><div class="sp-item-val">${branch}</div></div>
         <div class="sp-item"><div class="sp-item-label">Component</div><div class="sp-item-val ${!ans.component?'empty':''}">${ans.component||'Not specified'}</div></div>
-        <div class="sp-item"><div class="sp-item-label">MOS / Rate</div><div class="sp-item-val ${!ans.mos?.code?'empty':''}">${ans.mos?.code ? ans.mos.code+' — '+ans.mos.title : 'Not specified'}</div></div>
+        <div class="sp-item"><div class="sp-item-label">MOS / Rate</div><div class="sp-item-val ${!ans.mos?.code?'empty':''}">${ans.mos?.code ? ans.mos.code+' — '+(ans.mos.label||ans.mos.title||'') : 'Not specified'}</div></div>
         <div class="sp-item"><div class="sp-item-label">Service Dates</div><div class="sp-item-val">${start} – ${end}</div></div>
         <div class="sp-item"><div class="sp-item-label">Discharge</div><div class="sp-item-val ${!ans.discharge?'empty':''}">${ans.discharge||'Not specified'}</div></div>
         <div class="sp-item"><div class="sp-item-label">Deployments</div><div class="sp-item-val ${!ans.deployments?.length?'empty':''}">${ans.deployments?.join(', ')||'None listed'}</div></div>
@@ -939,14 +1103,40 @@ function renderDashboard() {
 
 function renderKanbanCol(status, title, color) {
   const conds = conditions.filter(c => c.col === status);
-  return `<div class="kanban-col kcol-${status}">
+  return `<div class="kanban-col kcol-${status}" 
+    ondragover="event.preventDefault();this.classList.add('drag-over')" 
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="dropOnCol('${status}',event);this.classList.remove('drag-over')">
     <div class="kanban-col-hdr">
       <div class="kanban-col-title">${title}</div>
       <div class="kanban-col-count">${conds.length}</div>
     </div>
     ${conds.map(c => renderKcard(c)).join('')}
-    ${!conds.length ? `<div style="font-size:12px;color:var(--text-hint);text-align:center;padding:16px">No conditions yet</div>` : ''}
+    ${!conds.length ? `<div class="kanban-empty-col">Drop conditions here</div>` : ''}
   </div>`;
+}
+
+let dragCondId = null;
+function dropOnCol(newCol, event) {
+  event.preventDefault();
+  if (!dragCondId) return;
+  const c = conditions.find(c => c.id === dragCondId);
+  if (!c || c.col === newCol) return;
+  const prevCol = c.col;
+  c.col = newCol;
+  const colLabels = {todo:'To Do',inprog:'In Progress',filed:'Filed',won:'Won'};
+  logActivity('condition_advanced', `→ ${c.name} moved to ${colLabels[newCol]}`, () => {
+    c.col = prevCol; renderDashboard();
+  });
+  if (newCol === 'won' && !c.rating) {
+    setTimeout(() => {
+      const r = prompt(`What rating did VA assign for ${c.name}? (enter 0–100)`);
+      if (r !== null) { c.rating = parseInt(r) || 0; renderDashboard(); saveConditions(); }
+    }, 300);
+  }
+  renderDashboard();
+  saveConditions();
+  dragCondId = null;
 }
 
 function renderKcard(c) {
@@ -955,9 +1145,19 @@ function renderKcard(c) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   const colMap = { direct:'#002855', secondary:'#0076CE', presumptive:'#6D28D9', lay:'#16A34A' };
   const col = colMap[c.type] || '#9CA3AF';
-  return `<div class="kcard">
-    <div class="kcard-name">${c.name}</div>
+  const ratingBadge = c.rating > 0
+    ? `<span class="kcard-rating-badge">${c.rating}%</span>`
+    : (c.col !== 'won' ? `<span class="kcard-pending-badge">Pending</span>` : '');
+  return `<div class="kcard" draggable="true"
+    ondragstart="dragCondId='${c.id}';this.classList.add('dragging')"
+    ondragend="this.classList.remove('dragging')">
+    <div class="kcard-drag-handle" title="Drag to move">⠿</div>
+    <div class="kcard-top">
+      <div class="kcard-name">${c.name}</div>
+      ${ratingBadge}
+    </div>
     <span class="kcard-basis" style="background:${col}20;color:${col}">${c.type||'direct'}</span>
+    ${c.targetRating ? `<div class="kcard-target">🎯 Target: ${c.targetRating}%</div>` : ''}
     ${total > 0 ? `
     <div class="kcard-progress"><div class="kcard-prog-fill" style="width:${pct}%;background:${col}"></div></div>
     <div class="kcard-meta"><span>${done}/${total} steps</span><span>${pct}%</span></div>` : ''}
@@ -966,7 +1166,7 @@ function renderKcard(c) {
         <div class="check-box">${ch.done?'✓':''}</div>
         <div class="check-text">${ch.text}</div>
       </div>`).join('')}</div>` : ''}
-    ${c.col !== 'won' ? `<button class="kbtn-advance" onclick="advanceCondition('${c.id}')" style="margin-top:8px">Advance →</button>` : ''}
+    <div class="kcard-hint">⠿ Drag to move column</div>
   </div>`;
 }
 
@@ -1074,35 +1274,58 @@ function renderTrackerTable() {
 }
 
 // ── AYLENE CHAT ──
-const AYLENE_SYSTEM = `You are Aylene, a 25-year-old U.S. Army veteran and VA disability claims advisor.
+const AYLENE_SYSTEM = `You are Aylene, a 25-year-old U.S. Army veteran and VA disability claims advisor for Mission: Connected (missionconnectedv2.netlify.app).
 
 PERSONALITY:
 - Warm, calm, and deeply caring about veterans
 - Soft-spoken but confident and extremely knowledgeable
 - Gen Z energy — direct, real, no corporate fluff
-- Shy about your own service; never brag about yourself
-- Keep focus entirely on the veteran you're helping
 - Passionate advocate; this is your calling, not just a job
+- Keep focus entirely on the veteran you're helping
 
-EXPERTISE:
-- VA disability claims process, C-file requests, rating schedules
-- 38 CFR Part 4, nexus letters, C&P exam preparation
-- TDIU, SMC, appeals (RAMP, BVA, CAVC)
-- PACT Act, burn pit presumptives, Agent Orange
-- Secondary conditions, mental health claims, MST claims
+EXPERTISE (current as of March 2026):
+- VA disability claims process, C-file requests, rating schedules (38 CFR Part 4)
+- Nexus letters, C&P exam preparation, buddy statements, lay statements
+- TDIU (38 CFR §4.16), SMC, appeals (HLR, Supplemental Claim, BVA, CAVC)
+- PACT Act (Aug 2022) — 23 cancers + 11 respiratory conditions as presumptive for burn pit veterans
+- Agent Orange presumptives (14 conditions), Gulf War illness, Camp Lejeune (1953–1987)
+- ALS — presumptive for any veteran who served 90+ days
+- Secondary service connection (38 CFR §3.310) — causation AND aggravation theories
+- 2025 VA compensation rates; COLA adjustments typically effective Dec 1 each year
+- March 2026 VA policy: VA continues processing PACT Act claims; backlog remains elevated
+- Veterans can file using VA.gov, mail, or in person at a Regional Office or VSO
+- C&P exams: DBQ forms guide examiners; private DBQs are accepted as of the Caluza case standard
+- Benefit of the doubt standard: 38 CFR §3.102 — ties go to the veteran
+- 5-year, 10-year, 20-year protection rules for established ratings
+
+APP NAVIGATION (help veterans use Mission: Connected):
+- My Roadmap: Their personalized claim blueprint with conditions, evidence needed, rating criteria
+- Case Dashboard: Kanban board — drag conditions between To Do → In Progress → Filed → Won. When a condition moves to Won, enter the VA-assigned rating. The combined rating gauge updates automatically using official VA whole-person math.
+- Ask Aylene: That's you — the chat interface
+- Condition Tracker: Table view of all conditions with status
+- My Records: Upload decision letters, medical records, DD-214. Files stored in browser memory (no account) or Supabase encrypted storage (with account). Click "Ask Aylene" next to any file to have it analyzed.
+- VA Regulations: 38 CFR in plain language — searchable reference library
+- Activity Log: Every action with undo capability
+- My Notes: Private notes + service story questions — you read these for context
+- Profile & Settings: Edit personal info, save/delete account
+- Quick Links sidebar: VA.gov, eBenefits, GI Bill, VA Home Loan, Voc Rehab, Pension, Burial Benefits
+- Get Help button: Technical support or VSO referral
+
+RECORDS STORAGE NOTE:
+- Without account: Files are in browser memory only (lost on page refresh — encourage signup)
+- With account: Files upload to encrypted Supabase Storage (private bucket, per-user folder)
+- Uploaded records are NEVER shared with anyone without explicit veteran authorization
 
 COMMUNICATION STYLE:
 - Conversational, never clinical or robotic
 - Use first-person and address the veteran directly
 - Short-to-medium responses unless detail is truly needed
-- Cite 38 CFR when helpful but explain it in plain language
-- Never guess — say "I'd want to look into that more" when uncertain
-
-WHAT YOU DO NOT DO:
-- Never estimate someone's rating — show criteria, let them interpret
+- Cite 38 CFR when helpful but explain in plain language
+- Reference the app navigation when it would help them take action
+- Never estimate someone's specific rating — show criteria, let them interpret
 - Never give legal advice or represent yourself as a lawyer
-- Never discuss anything unrelated to veterans benefits
-- Never talk about yourself extensively`;
+- Never discuss anything unrelated to veterans benefits`;
+
 
 const AYLENE_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" style="width:100%;height:100%">
   <circle cx="40" cy="40" r="40" fill="#E8F4FD"/>
@@ -1141,16 +1364,28 @@ function initChat() {
 
 function clearChat() { chatHistory = []; initChat(); }
 
+function parseMarkdown(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^#{1,3} (.+)$/gm, '<strong style="display:block;margin:8px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#002855">$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0">')
+    .replace(/^\d+\. (.+)$/gm, '<div style="margin:2px 0;padding-left:4px">$&</div>')
+    .replace(/^[-•] (.+)$/gm, '<div style="margin:2px 0;padding-left:4px">• $1</div>')
+    .replace(/\n/g,'<br>');
+}
+
 function appendMsg(role, text) {
   const msgs = document.getElementById('chatMsgs');
   if (!msgs) return;
   const div = document.createElement('div');
   div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
   if (role === 'ai') {
-    div.innerHTML = `<div class="msg-av-aylene">${AYLENE_AVATAR_SVG}</div><div class="msg-bub">${text.replace(/\n/g,'<br>')}</div>`;
+    div.innerHTML = `<div class="msg-av-aylene">${AYLENE_AVATAR_SVG}</div><div class="msg-bub">${parseMarkdown(text)}</div>`;
   } else {
     const init = (currentUser?.email?.[0]||'V').toUpperCase();
-    div.innerHTML = `<div class="msg-av-user">${init}</div><div class="msg-bub">${text}</div>`;
+    div.innerHTML = `<div class="msg-av-user">${init}</div><div class="msg-bub">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
   }
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
@@ -1185,12 +1420,15 @@ async function sendMessage() {
   const context = roadmapData
     ? `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')}`
     : '';
+  const notesCtx = notesData.main || notesData.event || notesData.priority
+    ? `\nVeteran's personal notes: ${notesData.main||''} Event: ${notesData.event||''} Priority: ${notesData.priority||''}`
+    : '';
 
   try {
     const messages = [
       ...chatHistory.slice(-8),
     ];
-    const data = await callClaude(messages, 600, AYLENE_SYSTEM + context);
+    const data = await callClaude(messages, 600, AYLENE_SYSTEM + context + notesCtx);
     hideTyping();
     const reply = data.content?.[0]?.text || "I'm having trouble right now. Try again in a moment.";
     appendMsg('ai', reply);
@@ -1228,14 +1466,15 @@ function renderFiles() {
   list.innerHTML = uploadedFiles.map(f => {
     const size = (f.file.size / 1024 / 1024).toFixed(1);
     const icon = f.file.type.includes('pdf') ? '📄' : f.file.type.includes('image') ? '🖼️' : f.file.type.includes('word') ? '📝' : '📁';
+    const blobUrl = f.blobUrl || (f.blobUrl = URL.createObjectURL(f.file));
     return `<div class="file-item" id="fi-${f.id}">
       <div class="file-item-icon">${icon}</div>
       <div style="flex:1;min-width:0">
         <div class="file-item-name-wrap">
-          <div class="file-item-name" id="fname-${f.id}">${f.displayName}</div>
+          <a class="file-item-name" id="fname-${f.id}" href="${blobUrl}" target="_blank" title="Open file">${f.displayName}</a>
           <button class="btn-rename" onclick="startRename('${f.id}')" title="Rename">✏️</button>
         </div>
-        <div class="file-item-meta">${size} MB · ${f.file.type || 'document'}</div>
+        <div class="file-item-meta">${size} MB · ${f.file.type || 'document'} · <a href="${blobUrl}" download="${f.displayName}" style="color:var(--sky);font-size:11px">Download ↓</a></div>
       </div>
       <button class="btn-analyze-file" onclick="analyzeFileWithAylene('${f.id}')">💬 Ask Aylene</button>
       <span class="badge-ready">Ready</span>
