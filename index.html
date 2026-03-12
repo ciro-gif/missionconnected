@@ -591,7 +591,7 @@
     </div>
     <div class="a-tb-right">
       <div class="a-tb-sponsor">Powered by <strong>Your Sponsor Here</strong></div>
-      <div class="a-tb-ai"><span></span> AI Ready</div>
+      <div class="a-tb-ai" id="networkStatus" onclick="checkNetworkStatus()"><span id="netDot"></span> <span id="netLabel">Checking...</span></div>
       <div id="tbUserArea">
         <button class="btn-tb-signup" onclick="openAuth('signup')">Save My Roadmap →</button>
       </div>
@@ -613,14 +613,29 @@
       <div class="nav-item" id="nav-records" onclick="showPage('records')"><span class="nav-icon">📁</span> My Records</div>
       <div class="nav-item" id="nav-regulations" onclick="showPage('regulations')"><span class="nav-icon">📖</span> VA Regulations</div>
       <div class="nav-item" id="nav-activity" onclick="showPage('activity')"><span class="nav-icon">📋</span> Activity Log <span class="nav-badge" id="activityBadge">0</span></div>
+      <div class="nav-item" id="nav-notes" onclick="showPage('notes')"><span class="nav-icon">📝</span> My Notes</div>
 
       <!-- ACCOUNT -->
       <div class="nav-section-label" id="navAccountSection" style="display:none">Account</div>
       <div class="nav-item" id="nav-profile" onclick="showPage('profile')" style="display:none"><span class="nav-icon">👤</span> Profile &amp; Settings</div>
       <div class="nav-section-label">Quick Links</div>
-      <div class="nav-item" onclick="window.open('https://www.va.gov/disability/','_blank')"><span class="nav-icon">🔗</span> VA.gov</div>
-      <div class="nav-item" onclick="window.open('https://www.ebenefits.va.gov','_blank')"><span class="nav-icon">🔗</span> eBenefits</div>
+      <div class="nav-item nav-link-parent" onclick="window.open('https://www.va.gov/disability/','_blank')"><span class="nav-icon">🔗</span> VA.gov</div>
+      <div class="nav-item nav-link-parent" onclick="window.open('https://www.ebenefits.va.gov','_blank')"><span class="nav-icon">🔗</span> eBenefits</div>
+      <div class="nav-sub-label">VA Benefits</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/disability/compensation-rates/','_blank')">💰 Compensation Rates 2025</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/education/about-gi-bill-benefits/post-9-11/','_blank')">🎓 Post-9/11 GI Bill</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/housing-assistance/home-loans/','_blank')">🏠 VA Home Loan</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/health-care/about-va-health-benefits/','_blank')">🏥 VA Health Care</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/careers-employment/vocational-rehabilitation/','_blank')">💼 Voc Rehab (Ch.31)</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/pension/','_blank')">📋 VA Pension</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/burials-memorials/','_blank')">⭐ Burial Benefits</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/find-locations/','_blank')">📍 Find VA Locations</div>
+      <div class="nav-sub-label">Tools</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/decision-reviews/','_blank')">⚖️ Decision Reviews</div>
+      <div class="nav-sublink" onclick="window.open('https://www.va.gov/records/get-military-service-records/','_blank')">📁 Request STRs</div>
+      <div class="nav-sublink" onclick="window.open('https://iris.custhelp.va.gov/','_blank')">💬 Contact VA (IRIS)</div>
       <div class="sb-bottom">
+        <button class="btn-contact-help" onclick="openContactModal()">📞 Get Help</button>
         <div class="sponsor-slot">Your organization here<br><span style="color:var(--sky);font-size:10px">→ Become a sponsor</span></div>
       </div>
     </nav>
@@ -737,12 +752,52 @@
         <div id="activityContent"><div class="empty-state"><div style="font-size:32px;margin-bottom:10px">📋</div>No activity yet.</div></div>
       </div>
 
+      <!-- NOTES -->
+      <div class="page" id="page-notes">
+        <div class="pg-hdr">
+          <div><div class="pg-title">My Notes &amp; Context</div><div class="pg-sub">Private notes and additional context — Aylene reads these when you chat</div></div>
+          <button class="btn btn-primary" onclick="saveNotes()">💾 Save Notes</button>
+        </div>
+        <div class="notes-layout">
+          <div class="notes-card">
+            <div class="notes-card-hdr">📝 My Notes</div>
+            <div class="notes-card-sub">Reminders, goals, anything you want to remember. Aylene considers these when helping you.</div>
+            <textarea class="notes-ta" id="notesMain" placeholder="e.g. Doctor appointment May 14th... Ask about nexus letters for sleep apnea... Call DAV office next week..."></textarea>
+          </div>
+          <div class="notes-card">
+            <div class="notes-card-hdr">📖 My Service Story</div>
+            <div class="notes-card-sub">Your answers help Aylene give more personalized, accurate guidance. Share only what you're comfortable with.</div>
+            <div class="notes-q-item">
+              <label class="notes-q-label">Describe the in-service event or exposure that caused your condition(s). Where were you, what happened, when?</label>
+              <textarea class="notes-q-ta" id="nq-event" placeholder="e.g. During CBRN training at Fort Campbell in 2017, we worked with live chemical agents. I noticed breathing issues within weeks..."></textarea>
+            </div>
+            <div class="notes-q-item">
+              <label class="notes-q-label">How do your condition(s) affect your daily life, work, or relationships today?</label>
+              <textarea class="notes-q-ta" id="nq-impact" placeholder="e.g. Have to stop physical activity due to shortness of breath. Can't sleep more than 3–4 hours. Mood changes affecting my family..."></textarea>
+            </div>
+            <div class="notes-q-item">
+              <label class="notes-q-label">What medical treatment have you received? What have doctors said?</label>
+              <textarea class="notes-q-ta" id="nq-treatment" placeholder="e.g. Primary care prescribed an inhaler in 2021. VA confirmed asthma at last visit but didn't service-connect it..."></textarea>
+            </div>
+            <div class="notes-q-item">
+              <label class="notes-q-label">Anything specific you want Aylene to know or prioritize?</label>
+              <textarea class="notes-q-ta" id="nq-priority" placeholder="e.g. C&P exam scheduled in 6 weeks. Need to know what to say and what to avoid..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div id="notesSaveMsg" class="notes-save-msg" style="display:none">✅ Notes saved</div>
+      </div>
+
       <!-- PROFILE & SETTINGS -->
       <div class="page" id="page-profile">
         <div class="pg-hdr">
           <div><div class="pg-title">Profile &amp; Settings</div><div class="pg-sub">Manage your account information</div></div>
         </div>
         <div id="profileContent"><div class="empty-state">Sign in to view your profile.</div></div>
+        <div class="erase-zone">
+          <button class="btn-erase-all" onclick="confirmPermanentErase()">🗑️ Permanently Erase All My Records &amp; Account Data</button>
+          <div class="erase-note">Immediately and irreversibly deletes your account, roadmap, all conditions, uploaded records, and notes. Nothing is retained. Your data safety is our commitment — use this anytime.</div>
+        </div>
       </div>
 
     </main>
@@ -806,6 +861,60 @@
     <div class="m-foot">
       <button class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
       <button class="btn btn-primary" onclick="addCondition()">Add Condition</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTACT / HELP MODAL -->
+<div class="m-overlay" id="contactModal">
+  <div class="modal" style="max-width:560px">
+    <div class="m-hdr"><div class="m-title">Get Help</div><button class="btn-close" onclick="closeModal('contactModal')">✕</button></div>
+    <div class="m-body">
+      <div class="contact-options" id="contactOptions">
+        <div class="contact-opt" onclick="showContactForm('tech')">
+          <div class="contact-opt-icon">🛠️</div>
+          <div>
+            <div class="contact-opt-title">Technical Support</div>
+            <div class="contact-opt-sub">Report a bug, feature request, or issue with the app. No access to your records or case details.</div>
+          </div>
+          <div class="contact-opt-arrow">→</div>
+        </div>
+        <div class="contact-opt" onclick="showContactForm('vso')">
+          <div class="contact-opt-icon">🎖️</div>
+          <div>
+            <div class="contact-opt-title">Connect with a VSO Representative</div>
+            <div class="contact-opt-sub">Request a certified Veterans Service Organization rep to contact you about your claim. Optional: authorize sharing your profile and roadmap snapshot (no records or notes).</div>
+          </div>
+          <div class="contact-opt-arrow">→</div>
+        </div>
+      </div>
+      <!-- TECH FORM -->
+      <div id="contactTechForm" style="display:none">
+        <button class="btn-back-contact" onclick="showContactOptions()">← Back</button>
+        <div class="f-group" style="margin-top:16px"><label class="f-label">Your Name</label><input class="f-input" id="ctName" placeholder="First Last"></div>
+        <div class="f-group"><label class="f-label">Email</label><input class="f-input" id="ctEmail" type="email" placeholder="your@email.com"></div>
+        <div class="f-group"><label class="f-label">Describe the issue</label><textarea class="f-textarea" id="ctIssue" placeholder="What happened? What were you trying to do? What did you expect to happen?"></textarea></div>
+        <div class="contact-disclaimer">Technical questions only. No case-specific information or records will be shared with this form.</div>
+      </div>
+      <!-- VSO FORM -->
+      <div id="contactVSOForm" style="display:none">
+        <button class="btn-back-contact" onclick="showContactOptions()">← Back</button>
+        <div class="f-group" style="margin-top:16px"><label class="f-label">Your Name</label><input class="f-input" id="cvName" placeholder="First Last"></div>
+        <div class="f-group"><label class="f-label">Phone Number</label><input class="f-input" id="cvPhone" type="tel" placeholder="(555) 555-5555"></div>
+        <div class="f-group"><label class="f-label">Best time to reach you</label><input class="f-input" id="cvTime" placeholder="e.g. Weekday afternoons, EST"></div>
+        <div class="f-group"><label class="f-label">Briefly describe what you need help with</label><textarea class="f-textarea" id="cvNeed" placeholder="e.g. I need help filing my first claim, or understanding a denial letter I received..."></textarea></div>
+        <div class="f-group">
+          <label class="auth-privacy-label" style="display:flex;gap:10px;align-items:flex-start">
+            <input type="checkbox" id="cvAuthorize" style="margin-top:3px">
+            <span>I authorize Mission: Connected to share my profile information and roadmap summary with the VSO representative. <strong>No uploaded records, notes, or documents will be shared.</strong></span>
+          </label>
+        </div>
+        <div class="contact-disclaimer">A certified VSO representative will contact you within 2–3 business days. This is a referral service; the representative works independently of Mission: Connected.</div>
+      </div>
+    </div>
+    <div class="m-foot" id="contactModalFoot">
+      <button class="btn btn-outline" onclick="closeModal('contactModal')">Cancel</button>
+      <button class="btn btn-primary" id="contactSubmitBtn" onclick="submitContactForm()" style="display:none">Send →</button>
     </div>
   </div>
 </div>
