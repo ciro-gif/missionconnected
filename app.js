@@ -280,7 +280,28 @@ function removeRatingRow(btn) {
   updateMultiCalc();
 }
 
-// ── DEV SHORTCUT ──
+// Local VA rating criteria lookup (saves ~300 tokens per roadmap call)
+const RATING_CRITERIA = {
+  'ptsd':          [{pct:10,desc:'Occupational/social impairment due to mild or transient symptoms'},{pct:30,desc:'Occupational/social impairment with occasional decrease in work efficiency'},{pct:50,desc:'Reduced reliability and productivity; panic attacks more than once a week'},{pct:70,desc:'Occupational/social impairment with deficiencies in most areas'},{pct:100,desc:'Total occupational/social impairment'}],
+  'tinnitus':      [{pct:10,desc:'Tinnitus, recurrent — 10% is the max rating regardless of severity'}],
+  'hearing loss':  [{pct:0,desc:'0-100% based on pure tone average and speech discrimination scores from audiogram'}],
+  'asthma':        [{pct:10,desc:'FEV-1 of 71-80% or daily inhalational/oral bronchodilator therapy'},{pct:30,desc:'FEV-1 of 56-70% or daily inhalational/oral bronchodilator therapy with systemic corticosteroids'},{pct:60,desc:'FEV-1 less than 40% or more than one attack per week with episodes of respiratory failure'}],
+  'sleep apnea':   [{pct:0,desc:'Asymptomatic with documented sleep disorder breathing'},{pct:30,desc:'Persistent daytime hypersomnolence'},{pct:50,desc:'Requires use of breathing assistance device such as CPAP machine'},{pct:100,desc:'Chronic respiratory failure requiring tracheostomy'}],
+  'lumbar':        [{pct:10,desc:'Flexion limited to 60°, or painful motion'},{pct:20,desc:'Flexion limited to 40°'},{pct:40,desc:'Flexion limited to 30°'},{pct:50,desc:'Unfavorable ankylosis of the entire thoracolumbar spine'}],
+  'knee':          [{pct:10,desc:'Slight recurrent subluxation, painful motion'},{pct:20,desc:'Moderate disability — recurrent subluxation or lateral instability'},{pct:30,desc:'Severe instability with daily use of knee brace required'}],
+  'anxiety':       [{pct:10,desc:'Mild symptoms, no significant occupational impairment'},{pct:30,desc:'Occupational/social impairment with occasional decreases in work efficiency'},{pct:50,desc:'Reduced reliability and productivity'},{pct:70,desc:'Deficiencies in most areas of work, school, family relations'}],
+  'migraines':     [{pct:10,desc:'Characteristic prostrating attacks 1x/month or less'},{pct:30,desc:'Prostrating attacks occurring once monthly on average'},{pct:50,desc:'Very frequent completely prostrating and prolonged attacks productive of severe economic inadaptability'}],
+  'hypertension':  [{pct:10,desc:'Diastolic 100-109 or systolic 160-199'},{pct:20,desc:'Diastolic 110-119 or systolic 200+; or minimum evaluation with history of diastolic 110+'}],
+  'diabetes':      [{pct:10,desc:'Manageable by restricted diet only'},{pct:20,desc:'Requires insulin, restricted diet, or oral hypoglycemic agent'},{pct:40,desc:'Requires insulin and restricted diet, or oral hypoglycemic agent and restricted diet, with episodes of ketoacidosis'}],
+  'default':       [{pct:10,desc:'Mild — minimal symptoms with little functional impairment'},{pct:30,desc:'Moderate — occasional symptoms affecting occupational/social function'},{pct:50,desc:'Moderately severe — significant impact on daily and occupational function'},{pct:70,desc:'Severe — frequent and debilitating symptoms'}]
+};
+function getRatingCriteria(condName) {
+  const name = (condName || '').toLowerCase();
+  for (const [key, criteria] of Object.entries(RATING_CRITERIA)) {
+    if (name.includes(key)) return criteria;
+  }
+  return RATING_CRITERIA.default;
+}
 function devFillScreener() {
   ans.goal = 'initial';
   ans.branch = ['Army'];
@@ -664,25 +685,23 @@ async function buildRoadmap() {
   }, 1800);
 
   const mosLabel = ans.mos?.label || ans.mos?.title || '';
-  const teraFlag = ans.mos?.tera ? ' [TERA ELIGIBLE]' : '';
-  const prompt = `VA disability expert. Build a claim roadmap. Return ONLY valid JSON, no markdown.
+  const teraFlag = ans.mos?.tera ? ' [TERA]' : '';
+  const prompt = `VA claims expert. Veteran profile below. Return ONLY minified JSON, no markdown.
 
-VETERAN: ${ans.branch?.join('/')} ${ans.component} | MOS ${ans.mos?.code||'?'} ${mosLabel}${teraFlag}
-Service: ${ans.startYear}-${ans.endYear} | Discharge: ${ans.discharge}
-Deployments: ${ans.deployments?.join(', ')||'None'} | Exposures: ${ans.exposures?.join(', ')||'None'}
-VA Status: ${ans.vaStatus} | Rated: ${ans.ratedConds?.join(', ')||'None'}
-Symptoms: ${ans.symptoms?.join(', ')||'None'}
-Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
-Events: ${ans.events?.join(', ')||'None'}
-Evidence: ${ans.evidence?.join(', ')||'None'}
+${ans.branch?.join('/')} ${ans.component}, MOS ${ans.mos?.code||'?'} ${mosLabel}${teraFlag}, ${ans.startYear}-${ans.endYear}, ${ans.discharge}
+Deployments:${ans.deployments?.join(',')||'None'} Exposures:${ans.exposures?.join(',')||'None'}
+VA:${ans.vaStatus} Rated:${ans.ratedConds?.join(',')||'None'}
+Symptoms:${ans.symptoms?.join(',')||'None'}
+Diagnoses:${ans.diagnoses?.join(',')||'None'}
+Events:${ans.events?.join(',')||'None'}
 
-JSON format:
-{"summary":"2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","nexus":"","evidence_have":"","evidence_need":"","action":"","secondaryTo":"","cfr":"","ratingCriteria":[{"pct":10,"desc":""},{"pct":30,"desc":""},{"pct":50,"desc":""}],"checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":""}
+Return this JSON with 2-4 conditions only:
+{"summary":"1-2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","nexus":"1 sentence","evidence_have":"brief","evidence_need":"brief","action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"1 sentence"}
 
-Rules: 3-5 conditions max. Specific to their MOS/exposures. High-value winnable claims only.`;
+Be specific to MOS. Winnable claims only. MINIFIED JSON ONLY.`;
 
   try {
-    const data = await callClaude([{role:'user',content:prompt}], 1500);
+    const data = await callClaude([{role:'user',content:prompt}], 1200);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -703,7 +722,7 @@ Rules: 3-5 conditions max. Specific to their MOS/exposures. High-value winnable 
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
       nexus: c.nexus, evidence_need: c.evidence_need, action: c.action,
       secondaryTo: c.secondaryTo||'', cfr: c.cfr||'',
-      ratingCriteria: c.ratingCriteria||[]
+      ratingCriteria: c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name)
     })) || [];
 
     if (currentUser) await saveRoadmapToSupabase();
