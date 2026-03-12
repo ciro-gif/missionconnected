@@ -19,6 +19,7 @@
     <div class="l-nav-right">
       <button class="btn-nav-signin" onclick="openAuth('signin')">Sign In</button>
       <button class="btn-nav-start" onclick="startScreener()">Free Screening →</button>
+      <button class="btn-dev-skip" onclick="devFillScreener()" title="DEV: Auto-fill test profile &amp; build roadmap">⚡ Dev Test</button>
     </div>
   </nav>
 
@@ -612,6 +613,10 @@
       <div class="nav-item" id="nav-records" onclick="showPage('records')"><span class="nav-icon">📁</span> My Records</div>
       <div class="nav-item" id="nav-regulations" onclick="showPage('regulations')"><span class="nav-icon">📖</span> VA Regulations</div>
       <div class="nav-item" id="nav-activity" onclick="showPage('activity')"><span class="nav-icon">📋</span> Activity Log <span class="nav-badge" id="activityBadge">0</span></div>
+
+      <!-- ACCOUNT -->
+      <div class="nav-section-label" id="navAccountSection" style="display:none">Account</div>
+      <div class="nav-item" id="nav-profile" onclick="showPage('profile')" style="display:none"><span class="nav-icon">👤</span> Profile &amp; Settings</div>
       <div class="nav-section-label">Quick Links</div>
       <div class="nav-item" onclick="window.open('https://www.va.gov/disability/','_blank')"><span class="nav-icon">🔗</span> VA.gov</div>
       <div class="nav-item" onclick="window.open('https://www.ebenefits.va.gov','_blank')"><span class="nav-icon">🔗</span> eBenefits</div>
@@ -730,6 +735,14 @@
           <button class="btn btn-outline" onclick="if(undoStack.length)undoLastAction()">↩ Undo Last</button>
         </div>
         <div id="activityContent"><div class="empty-state"><div style="font-size:32px;margin-bottom:10px">📋</div>No activity yet.</div></div>
+      </div>
+
+      <!-- PROFILE & SETTINGS -->
+      <div class="page" id="page-profile">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Profile &amp; Settings</div><div class="pg-sub">Manage your account information</div></div>
+        </div>
+        <div id="profileContent"><div class="empty-state">Sign in to view your profile.</div></div>
       </div>
 
     </main>
