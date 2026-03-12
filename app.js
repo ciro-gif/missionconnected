@@ -7,7 +7,7 @@
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
 const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
 const CLAUDE_KEY = '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';
-const CLAUDE_MODEL = 'claude-opus-4-5';
+const CLAUDE_MODEL = 'claude-sonnet-4-5-20251001';
 
 let sbClient = null;
 try { sbClient = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('Supabase init failed'); }
@@ -177,6 +177,28 @@ function undoSpecific(id) {
   catch(e) { console.warn('Undo failed:', e); }
 }
 
+function switchCalcTab(tab) {
+  document.getElementById('ctab-single').classList.toggle('active', tab === 'single');
+  document.getElementById('ctab-multi').classList.toggle('active', tab === 'multi');
+  document.getElementById('calcSingle').style.display = tab === 'single' ? 'block' : 'none';
+  document.getElementById('calcMulti').style.display = tab === 'multi' ? 'block' : 'none';
+}
+
+function addRatingRow() {
+  const container = document.getElementById('multiRatingInputs');
+  if (!container) return;
+  const count = container.querySelectorAll('.multi-rating-row').length + 1;
+  const row = document.createElement('div');
+  row.className = 'multi-rating-row';
+  row.innerHTML = `<input class="multi-rating-input calc-select" type="number" min="0" max="100" placeholder="Rating %" oninput="updateMultiCalc()"><span class="multi-rating-label">Condition ${count}</span><button class="btn-remove-rating" onclick="removeRatingRow(this)">✕</button>`;
+  container.appendChild(row);
+}
+
+function removeRatingRow(btn) {
+  btn.closest('.multi-rating-row')?.remove();
+  updateMultiCalc();
+}
+
 function requireAuth(fn) {
   if (currentUser) { fn(); return; }
   openAuth('signup');
@@ -289,20 +311,61 @@ async function saveRoadmapToSupabase() {
 }
 
 // ── CALC ──
+// VA Combined Rating uses "Whole Person" method:
+// Start with 100% whole person. Apply highest rating first, then each subsequent
+// rating applies to the REMAINING percentage. Round final to nearest 10%.
+function vaWholePerson(ratings) {
+  if (!ratings || ratings.length === 0) return 0;
+  const sorted = [...ratings].sort((a,b) => b - a);
+  let remaining = 100;
+  for (const r of sorted) {
+    remaining = remaining * (1 - r / 100);
+  }
+  const combined = 100 - remaining;
+  // VA rounds to nearest 10%, with 0.5 rounding UP
+  return Math.round(combined / 10) * 10;
+}
+
 function updateCalc() {
   const rating = parseInt(document.getElementById('calcRating').value);
   const deps = document.getElementById('calcDeps').value;
   const amountEl = document.getElementById('calcAmount');
   const annualEl = document.getElementById('calcAnnual');
+  const formulaEl = document.getElementById('calcFormula');
   if (!rating || !VA_RATES[rating]) {
     amountEl.textContent = 'Select a rating';
     annualEl.textContent = '';
+    if (formulaEl) formulaEl.textContent = '';
     return;
   }
   const monthly = VA_RATES[rating][deps] || VA_RATES[rating]['none'];
   const annual = (monthly * 12).toFixed(0);
   amountEl.textContent = '$' + monthly.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   annualEl.textContent = '$' + parseInt(annual).toLocaleString() + '/year';
+}
+
+function updateMultiCalc() {
+  // Multi-condition combined rating calculator
+  const inputs = document.querySelectorAll('.multi-rating-input');
+  const ratings = Array.from(inputs).map(i => parseInt(i.value)).filter(v => v > 0 && v <= 100);
+  if (ratings.length === 0) { document.getElementById('multiCalcResult').innerHTML = ''; return; }
+  const sorted = [...ratings].sort((a,b) => b-a);
+  let remaining = 100;
+  const steps = sorted.map(r => {
+    const disabled = remaining * (r/100);
+    remaining = remaining - disabled;
+    return { r, disabled: disabled.toFixed(1), remaining: remaining.toFixed(1) };
+  });
+  const rawCombined = 100 - remaining;
+  const rounded = Math.round(rawCombined / 10) * 10;
+  const stepHtml = steps.map((s,i) => `<div class="calc-step"><span class="calc-step-num">${i===0?'Start':'Then'}</span> ${s.r}% of ${i===0?'100':steps[i-1].remaining}% = <strong>${s.disabled}%</strong> disabled → ${s.remaining}% remaining</div>`).join('');
+  document.getElementById('multiCalcResult').innerHTML = `
+    <div class="calc-steps-wrap">${stepHtml}</div>
+    <div class="calc-combined-result">
+      <div>Raw combined: <strong>${rawCombined.toFixed(1)}%</strong></div>
+      <div>VA rounds to nearest 10%: <strong class="calc-final">${rounded}%</strong></div>
+      ${rounded >= 100 ? '<div class="calc-note-100">🏆 100% combined rating!</div>' : ''}
+    </div>`;
 }
 
 // ── SCREENER ──
@@ -550,10 +613,19 @@ Generate a JSON roadmap in this exact format:
 Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific to their MOS and exposures. Return ONLY valid JSON.`;
 
   try {
-    const data = await callClaude([{role:'user',content:prompt}], 2000);
+    const data = await callClaude([{role:'user',content:prompt}], 4000);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
-    const clean = text.replace(/```json|```/g,'').trim();
+    // Try code fence first, then bare JSON object
+    let clean = text;
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      clean = fenceMatch[1].trim();
+    } else {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON in response: ' + text.slice(0, 200));
+      clean = jsonMatch[0];
+    }
     roadmapData = JSON.parse(clean);
 
     // Build conditions from roadmap
@@ -575,8 +647,10 @@ Include 4–10 conditions. Prioritize high-value, winnable claims. Be specific t
   } catch(e) {
     clearInterval(stepInterval);
     console.error('Roadmap error:', e);
-    // fallback
-    roadmapData = { summary: 'Your roadmap is ready.', conditions:[], error: e.message };
+    roadmapData = {
+      summary: `There was an error generating your roadmap: ${e.message}. Please try again — this is usually a temporary API issue.`,
+      conditions: [], error: e.message, totalConditions: 0
+    };
     showView('vApp');
     showPage('roadmap');
     renderRoadmap(roadmapData);
@@ -846,13 +920,23 @@ function openAddModal() {
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
 function showPrivacyPolicy() { document.getElementById('privacyModal')?.classList.add('active'); }
 
+function toggleSecondaryField(val) {
+  const el = document.getElementById('secondaryToField');
+  if (el) el.style.display = val === 'secondary' ? 'block' : 'none';
+}
+
 function addCondition() {
   const name = document.getElementById('addCondName').value.trim();
   if (!name) { alert('Please enter a condition name.'); return; }
   const type = document.getElementById('addCondBasis').value;
   const status = document.getElementById('addCondStatus').value;
+  const rating = parseInt(document.getElementById('addCondRating')?.value || '0');
+  const targetRating = parseInt(document.getElementById('addCondTargetRating')?.value || '0');
+  const secondaryTo = document.getElementById('addCondSecondaryTo')?.value?.trim() || '';
+  const notes = document.getElementById('addCondNotes')?.value?.trim() || '';
   const newCond = {
     id: 'local-' + Date.now(), name, type, col: status,
+    rating, targetRating, secondaryTo, notes,
     checks: [
       {text:'Get current diagnosis from doctor',done:false},
       {text:'Gather supporting evidence',done:false},
@@ -860,7 +944,7 @@ function addCondition() {
     ]
   };
   conditions.push(newCond);
-  logActivity('condition_added', `➕ Added condition: ${name}`, () => {
+  logActivity('condition_added', `➕ Added condition: ${name}${rating ? ' ('+rating+'% rated)' : ''}`, () => {
     conditions = conditions.filter(c => c.id !== newCond.id);
     renderDashboard(); renderTrackerTable();
   });
@@ -1028,7 +1112,9 @@ function autoResize(el) {
 // ── RECORDS ──
 function handleFileSelect(e) {
   Array.from(e.target.files).forEach(file => {
-    uploadedFiles.push({ file, id: Date.now() + Math.random() });
+    const id = 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+    uploadedFiles.push({ file, id, displayName: file.name, analyzing: false });
+    logActivity('file_uploaded', `📁 Uploaded: ${file.name}`);
     renderFiles();
   });
 }
@@ -1036,20 +1122,110 @@ function handleFileSelect(e) {
 function renderFiles() {
   const list = document.getElementById('fileList');
   if (!list) return;
+  if (!uploadedFiles.length) { list.innerHTML = ''; return; }
   list.innerHTML = uploadedFiles.map(f => {
     const size = (f.file.size / 1024 / 1024).toFixed(1);
-    const icon = f.file.type.includes('pdf') ? '📄' : f.file.type.includes('image') ? '🖼️' : '📁';
-    return `<div class="file-item">
+    const icon = f.file.type.includes('pdf') ? '📄' : f.file.type.includes('image') ? '🖼️' : f.file.type.includes('word') ? '📝' : '📁';
+    return `<div class="file-item" id="fi-${f.id}">
       <div class="file-item-icon">${icon}</div>
-      <div style="flex:1"><div class="file-item-name">${f.file.name}</div><div class="file-item-size">${size} MB</div></div>
+      <div style="flex:1;min-width:0">
+        <div class="file-item-name-wrap">
+          <div class="file-item-name" id="fname-${f.id}">${f.displayName}</div>
+          <button class="btn-rename" onclick="startRename('${f.id}')" title="Rename">✏️</button>
+        </div>
+        <div class="file-item-meta">${size} MB · ${f.file.type || 'document'}</div>
+      </div>
+      <button class="btn-analyze-file" onclick="analyzeFileWithAylene('${f.id}')">💬 Ask Aylene</button>
       <span class="badge-ready">Ready</span>
       <button class="btn-remove-file" onclick="removeFile('${f.id}')">✕</button>
     </div>`;
   }).join('');
 }
 
+function startRename(id) {
+  const f = uploadedFiles.find(f => f.id === id);
+  if (!f) return;
+  const nameEl = document.getElementById('fname-' + id);
+  const current = f.displayName;
+  nameEl.innerHTML = `<input class="file-rename-input" value="${current}" onblur="finishRename('${id}',this.value)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${current}';this.blur();}">`;
+  nameEl.querySelector('input').select();
+}
+
+function finishRename(id, newName) {
+  const f = uploadedFiles.find(f => f.id === id);
+  if (!f || !newName.trim()) { renderFiles(); return; }
+  const oldName = f.displayName;
+  f.displayName = newName.trim();
+  logActivity('file_renamed', `✏️ Renamed: "${oldName}" → "${newName.trim()}"`, () => {
+    f.displayName = oldName; renderFiles();
+  });
+  renderFiles();
+}
+
+async function analyzeFileWithAylene(id) {
+  const f = uploadedFiles.find(f => f.id === id);
+  if (!f) return;
+  showPage('chat');
+  if (chatHistory.length === 0) initChat();
+  // Read file content
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const content = e.target.result;
+    const isPDF = f.file.type.includes('pdf');
+    const isImage = f.file.type.includes('image');
+    setTimeout(async () => {
+      const userMsg = `Please analyze this document for me: "${f.displayName}"`;
+      appendMsg('user', userMsg);
+      const delay = 1500 + Math.random() * 2000;
+      await new Promise(r => setTimeout(r, delay));
+      showTyping();
+      try {
+        let messages;
+        if (isImage) {
+          // Send as image to Claude vision
+          const base64 = content.split(',')[1];
+          const mtype = f.file.type;
+          messages = [
+            ...chatHistory.slice(-6),
+            { role: 'user', content: [
+              { type: 'image', source: { type: 'base64', media_type: mtype, data: base64 } },
+              { type: 'text', text: `This veteran uploaded a document called "${f.displayName}". Please analyze it in the context of their VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable. Summarize what you find and give specific next steps.` }
+            ]}
+          ];
+        } else {
+          // Text-based - extract text content
+          const textContent = typeof content === 'string' ? content.substring(0, 8000) : '[Binary file - cannot read text]';
+          messages = [
+            ...chatHistory.slice(-6),
+            { role: 'user', content: `I'm uploading a document called "${f.displayName}". Here's the text content:\n\n${textContent}\n\nPlease analyze this for my VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable.` }
+          ];
+        }
+        const context = `Veteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')||'None yet'}`;
+        const data = await callClaude(messages, 1000, AYLENE_SYSTEM + '\n' + context);
+        hideTyping();
+        const reply = data.content?.[0]?.text || "I wasn't able to read that file. Try copying key text and pasting it directly in the chat.";
+        appendMsg('ai', reply);
+        chatHistory.push({ role: 'user', content: userMsg });
+        chatHistory.push({ role: 'assistant', content: reply });
+      } catch(err) {
+        hideTyping();
+        appendMsg('ai', `I had trouble reading that file. You can copy and paste key sections directly into the chat and I'll analyze them for you.`);
+      }
+    }, 400);
+  };
+  if (f.file.type.includes('image')) {
+    reader.readAsDataURL(f.file);
+  } else {
+    reader.readAsText(f.file);
+  }
+}
+
 function removeFile(id) {
-  uploadedFiles = uploadedFiles.filter(f => f.id != id);
+  const f = uploadedFiles.find(f => f.id === id);
+  if (f) logActivity('file_removed', `🗑️ Removed: ${f.displayName}`, () => {
+    uploadedFiles.push(f); renderFiles();
+  });
+  uploadedFiles = uploadedFiles.filter(f => f.id !== id);
   renderFiles();
 }
 
