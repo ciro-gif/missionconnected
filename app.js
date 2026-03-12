@@ -7,7 +7,7 @@
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
 const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
 const CLAUDE_KEY = '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';
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20251001';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 let sbClient = null;
 try { sbClient = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('Supabase init failed'); }
@@ -70,15 +70,91 @@ function setUser(user) {
   currentUser = user;
   updateTopbar();
   loadUserData();
+  const profileNav = document.getElementById('nav-profile');
+  const profileSection = document.getElementById('navAccountSection');
+  if (profileNav) profileNav.style.display = user ? 'flex' : 'none';
+  if (profileSection) profileSection.style.display = user ? 'block' : 'none';
+}
+
+function renderProfile() {
+  const el = document.getElementById('profileContent');
+  if (!el) return;
+  if (!currentUser) { el.innerHTML = '<div class="empty-state">Please sign in to view your profile.</div>'; return; }
+  const meta = currentUser.user_metadata || {};
+  const name = meta.full_name || '';
+  const phone = meta.phone || '';
+  const state = meta.state || '';
+  const bMonth = meta.birth_month || '';
+  const bYear = meta.birth_year || '';
+  el.innerHTML = `
+    <div class="profile-wrap">
+      <div class="profile-avatar-lg">${(name[0]||currentUser.email[0]||'V').toUpperCase()}</div>
+      <div class="profile-section">
+        <div class="profile-section-title">Personal Information</div>
+        <div class="profile-grid">
+          <div class="profile-field"><label class="f-label">Full Name</label><input class="f-input" id="pf-name" value="${name}" placeholder="First Last"></div>
+          <div class="profile-field"><label class="f-label">Phone</label><input class="f-input" id="pf-phone" value="${phone}" placeholder="(555) 555-5555"></div>
+          <div class="profile-field"><label class="f-label">State</label><input class="f-input" id="pf-state" value="${state}" placeholder="TX"></div>
+          <div class="profile-field"><label class="f-label">Birth Month / Year</label>
+            <div style="display:flex;gap:8px">
+              <input class="f-input" id="pf-bmonth" value="${bMonth}" placeholder="MM" style="width:80px">
+              <input class="f-input" id="pf-byear" value="${bYear}" placeholder="YYYY" style="width:100px">
+            </div>
+          </div>
+          <div class="profile-field"><label class="f-label">Email</label><input class="f-input" value="${currentUser.email}" disabled style="opacity:.6"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()" style="margin-top:16px">Save Changes</button>
+        <div id="profileSaveMsg" style="margin-top:10px;font-size:13px;color:var(--green);display:none">✅ Saved!</div>
+      </div>
+      <div class="profile-section" style="margin-top:24px">
+        <div class="profile-section-title">Account Actions</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-outline" onclick="signOut()">Sign Out</button>
+          <button class="btn btn-outline" style="color:var(--red);border-color:var(--red)" onclick="if(confirm('Delete your account and all data? This cannot be undone.'))deleteAccount()">Delete Account</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveProfile() {
+  if (!sbClient || !currentUser) return;
+  const name = document.getElementById('pf-name')?.value?.trim();
+  const phone = document.getElementById('pf-phone')?.value?.trim();
+  const state = document.getElementById('pf-state')?.value?.trim();
+  const bMonth = document.getElementById('pf-bmonth')?.value?.trim();
+  const bYear = document.getElementById('pf-byear')?.value?.trim();
+  try {
+    await sbClient.auth.updateUser({ data: { full_name: name, phone, state, birth_month: bMonth, birth_year: bYear } });
+    await sbClient.from('profiles').upsert({ id: currentUser.id, full_name: name, phone, state, birth_month: bMonth, birth_year: bYear });
+    // Update local user object
+    currentUser.user_metadata = { ...currentUser.user_metadata, full_name: name, phone, state, birth_month: bMonth, birth_year: bYear };
+    updateTopbar();
+    const msg = document.getElementById('profileSaveMsg');
+    if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display='none', 2500); }
+    logActivity('profile_updated', '👤 Profile updated');
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+async function deleteAccount() {
+  // Supabase doesn't allow client-side delete, so just sign out and show message
+  await signOut();
+  alert('To permanently delete your account and data, email hello@missionconnected.vet from your registered address.');
 }
 
 function updateTopbar() {
   const area = document.getElementById('tbUserArea');
   if (!area) return;
   if (currentUser) {
-    const email = currentUser.email || '';
-    const initial = email[0]?.toUpperCase() || 'V';
-    area.innerHTML = `<div class="a-tb-user"><div class="a-tb-avatar-sm">${initial}</div><span class="a-tb-user-email">${email}</span><button class="btn-tb-out" onclick="signOut()">Sign Out</button></div>`;
+    const meta = currentUser.user_metadata || {};
+    const name = meta.full_name || currentUser.email?.split('@')[0] || 'Veteran';
+    const initial = name[0]?.toUpperCase() || 'V';
+    area.innerHTML = `
+      <div class="a-tb-user">
+        <div class="a-tb-avatar-sm" onclick="showPage('profile')" style="cursor:pointer" title="Profile settings">${initial}</div>
+        <span class="a-tb-user-email" onclick="showPage('profile')" style="cursor:pointer" title="Profile settings">${name}</span>
+        <button class="btn-tb-profile" onclick="showPage('profile')" title="Profile &amp; Settings">⚙️</button>
+        <button class="btn-tb-out" onclick="signOut()">Sign Out</button>
+      </div>`;
   } else {
     area.innerHTML = `<button class="btn-tb-signup" onclick="openAuth('signup')">Save My Roadmap →</button>`;
   }
@@ -102,6 +178,10 @@ function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
   currentView = id;
+  // When going to vApp, default to roadmap (not dashboard) unless we have one
+  if (id === 'vApp' && currentPage === 'dashboard' && !roadmapData) {
+    showPage('roadmap');
+  }
 }
 
 function showPage(id) {
@@ -115,6 +195,7 @@ function showPage(id) {
   if (id === 'regulations') buildRegsTree();
   if (id === 'tracker') renderTrackerTable();
   if (id === 'activity') renderActivityLog();
+  if (id === 'profile') renderProfile();
 }
 
 // ── ACTIVITY LOG ──
@@ -197,6 +278,29 @@ function addRatingRow() {
 function removeRatingRow(btn) {
   btn.closest('.multi-rating-row')?.remove();
   updateMultiCalc();
+}
+
+// ── DEV SHORTCUT ──
+function devFillScreener() {
+  ans.goal = 'initial';
+  ans.branch = ['Army'];
+  ans.component = 'Reserve';
+  ans.startYear = '2015';
+  ans.endYear = '2020';
+  ans.discharge = 'Honorable';
+  ans.mos = { code: '74D', label: 'CBRN Specialist', noise: 'Moderate', tera: true };
+  ans.deployments = ['CONUS_only'];
+  ans.exposures = ['chemicals', 'solvents', 'CBRN agents (training)'];
+  ans.vaStatus = 'none';
+  ans.ratedConds = [];
+  ans.symptoms = ['shortness of breath', 'wheezing', 'fatigue', 'chest tightness', 'poor sleep', 'anxiety'];
+  ans.diagnoses = ['Asthma', 'Sleep Apnea (suspected)', 'Anxiety'];
+  ans.events = ['Regular CBRN training with live chemical agents', 'Extended MOPP gear operations'];
+  ans.evidence = ['Service medical records showing asthma diagnosis in-service', 'DD-214'];
+  ans.impact = ['difficulty exercising', 'sleep disruption', 'work limitations'];
+  ans.followups = { nexus_letter: 'No', cpap: 'No', current_treatment: 'Albuterol inhaler' };
+  console.log('✅ Dev fill complete. Building roadmap...');
+  buildRoadmap();
 }
 
 function requireAuth(fn) {
