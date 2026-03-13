@@ -591,7 +591,9 @@
     </div>
     <div class="a-tb-right">
       <div class="a-tb-sponsor">Powered by <strong>Your Sponsor Here</strong></div>
-      <div class="a-tb-ai" id="networkStatus" onclick="checkNetworkStatus()"><span id="netDot"></span> <span id="netLabel">Checking...</span></div>
+      <div id="networkStatus" class="a-tb-net" onclick="checkNetworkStatus()" title="Click to re-check AI status">
+        <span id="netDot" class="net-dot"></span><span id="netLabel" class="net-label">Checking</span>
+      </div>
       <div id="tbUserArea">
         <button class="btn-tb-signup" onclick="openAuth('signup')">Save My Roadmap →</button>
       </div>
@@ -652,6 +654,7 @@
           </div>
         </div>
         <div id="roadmapContent"><div class="empty-state"><div style="font-size:36px;margin-bottom:10px">🗺️</div>Complete the screener to see your personalized roadmap.</div></div>
+        <div class="roadmap-dash-note">📊 <strong>Roadmap vs Dashboard:</strong> This roadmap is your AI-generated blueprint — it doesn't change. Your <button class="btn-link-inline" onclick="showPage('dashboard')">Case Dashboard →</button> is the live tracker where you drag conditions through stages, log your VA ratings, and watch your combined rating update in real time.</div>
         <div class="rm-gate-notice" id="roadmapGate" style="display:none">🔒 <strong>Save &amp; unlock full features:</strong> Print your roadmap, chat with Aylene, and track your case. <button class="btn btn-primary" style="margin-left:12px" onclick="openAuth('signup')">Create Free Account →</button></div>
       </div>
 
@@ -1007,6 +1010,34 @@
         <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
         <button class="btn btn-primary" onclick="saveEditCondition()">Save Changes</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- VA RATING PICKER MODAL (shown when condition dropped to Won) -->
+<div class="m-overlay" id="ratingPickerModal">
+  <div class="modal modal-rating">
+    <div class="m-hdr">
+      <div>
+        <div class="m-title" id="ratingPickerTitle">🏆 Condition Won — Enter VA Rating</div>
+        <div class="m-sub" id="ratingPickerSub">Select the rating VA assigned you</div>
+      </div>
+      <button class="btn-close" onclick="closeRatingPicker()">✕</button>
+    </div>
+    <div class="m-body">
+      <div class="rp-instruction">Select the percentage that matches your <strong>VA decision letter</strong> or <strong>C&P exam findings</strong>. Pick the row that best describes your symptoms on your worst days.</div>
+      <div id="ratingPickerOptions" class="rp-options"></div>
+      <div class="rp-custom-row">
+        <span class="rp-custom-label">My rating isn't listed or I need a specific %:</span>
+        <div class="rp-custom-input-row">
+          <input type="number" id="ratingCustomInput" class="rp-custom-input" min="0" max="100" step="10" placeholder="0–100">
+          <span class="rp-custom-pct">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-outline" onclick="closeRatingPicker()">Cancel — move back</button>
+      <button class="btn btn-primary" onclick="confirmRatingPick()">✓ Confirm Rating</button>
     </div>
   </div>
 </div>
