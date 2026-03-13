@@ -24,8 +24,109 @@ let uploadedFiles = [];
 let authMode = 'signin';
 let activityLog = [];
 let undoStack = [];
-let notesData = { main: '', event: '', impact: '', treatment: '', priority: '' };
+let notesData = { entries: [], story: { event:[], impact:[], treatment:[], priority:[] } };
 let networkOk = null;
+
+// ── NOTES ENTRY LOG SYSTEM ──
+function addNoteEntry() {
+  const ta = document.getElementById('noteCompose');
+  const text = ta?.value?.trim();
+  if (!text) return;
+  const entry = { id: Date.now(), text, ts: new Date().toISOString() };
+  notesData.entries.unshift(entry);
+  ta.value = '';
+  persistNotes();
+  renderNoteLog();
+  logActivity('note_added', `📝 Note added`);
+}
+
+function addStoryEntry(category) {
+  const ta = document.getElementById('sq-' + category);
+  const text = ta?.value?.trim();
+  if (!text) return;
+  const entry = { id: Date.now(), text, ts: new Date().toISOString() };
+  if (!notesData.story[category]) notesData.story[category] = [];
+  notesData.story[category].unshift(entry);
+  ta.value = '';
+  persistNotes();
+  renderStoryLog(category);
+  logActivity('story_entry_added', `📖 Service story entry added`);
+}
+
+function deleteNoteEntry(id) {
+  notesData.entries = notesData.entries.filter(e => e.id !== id);
+  persistNotes(); renderNoteLog();
+}
+
+function deleteStoryEntry(category, id) {
+  notesData.story[category] = (notesData.story[category] || []).filter(e => e.id !== id);
+  persistNotes(); renderStoryLog(category);
+}
+
+function renderNoteLog() {
+  const el = document.getElementById('noteLog');
+  if (!el) return;
+  if (!notesData.entries.length) {
+    el.innerHTML = '<div class="notes-empty">No notes yet. Add your first one above.</div>';
+    return;
+  }
+  el.innerHTML = notesData.entries.map(e => `
+    <div class="note-entry">
+      <div class="note-entry-text">${e.text.replace(/\n/g,'<br>')}</div>
+      <div class="note-entry-footer">
+        <span class="note-entry-ts">${formatNoteTs(e.ts)}</span>
+        <button class="btn-note-del" onclick="deleteNoteEntry(${e.id})" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderStoryLog(category) {
+  const el = document.getElementById('slog-' + category);
+  if (!el) return;
+  const entries = notesData.story[category] || [];
+  if (!entries.length) { el.innerHTML = ''; return; }
+  el.innerHTML = entries.map(e => `
+    <div class="note-entry story-entry">
+      <div class="note-entry-text">${e.text.replace(/\n/g,'<br>')}</div>
+      <div class="note-entry-footer">
+        <span class="note-entry-ts">${formatNoteTs(e.ts)}</span>
+        <button class="btn-note-del" onclick="deleteStoryEntry('${category}',${e.id})" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function formatNoteTs(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function persistNotes() {
+  try { localStorage.setItem('mc_notes_v2', JSON.stringify(notesData)); } catch(e) {}
+  if (currentUser && sbClient) {
+    sbClient.from('profiles').upsert({ id: currentUser.id, notes: notesData }).catch(e => console.warn('Notes save:', e));
+  }
+}
+
+function loadNotes() {
+  try {
+    const saved = localStorage.getItem('mc_notes_v2');
+    if (saved) notesData = JSON.parse(saved);
+  } catch(e) {}
+  renderNoteLog();
+  ['event','impact','treatment','priority'].forEach(renderStoryLog);
+}
+
+// Build notes context for Aylene
+function buildNotesContext() {
+  const parts = [];
+  if (notesData.entries.length) parts.push('Notes: ' + notesData.entries.slice(0,5).map(e=>e.text).join(' | '));
+  const story = notesData.story;
+  if (story.event?.length) parts.push('In-service events: ' + story.event.slice(0,3).map(e=>e.text).join(' | '));
+  if (story.impact?.length) parts.push('Daily impact: ' + story.impact.slice(0,2).map(e=>e.text).join(' | '));
+  if (story.treatment?.length) parts.push('Treatment: ' + story.treatment.slice(0,2).map(e=>e.text).join(' | '));
+  if (story.priority?.length) parts.push('Priority context: ' + story.priority.slice(0,2).map(e=>e.text).join(' | '));
+  return parts.length ? '\n\nVeteran context notes:\n' + parts.join('\n') : '';
+}
 
 // Screener answers
 const ans = {
@@ -57,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderAyleneAvatar();
   checkAuthState();
   setTimeout(checkNetworkStatus, 2000); // Check after page loads
+  setInterval(checkNetworkStatus, 5 * 60 * 1000); // Re-check every 5 minutes
 });
 
 async function checkAuthState() {
@@ -98,37 +200,6 @@ async function checkNetworkStatus() {
   } catch(e) {
     dot.style.background = '#DC2626'; label.textContent = 'Network Error';
   }
-}
-
-// ── NOTES ──
-function saveNotes() {
-  notesData = {
-    main: document.getElementById('notesMain')?.value || '',
-    event: document.getElementById('nq-event')?.value || '',
-    impact: document.getElementById('nq-impact')?.value || '',
-    treatment: document.getElementById('nq-treatment')?.value || '',
-    priority: document.getElementById('nq-priority')?.value || ''
-  };
-  // Save to localStorage for non-auth users, Supabase for auth
-  try { localStorage.setItem('mc_notes', JSON.stringify(notesData)); } catch(e) {}
-  if (currentUser && sbClient) {
-    sbClient.from('profiles').upsert({ id: currentUser.id, notes: notesData }).catch(e => console.warn('Notes save:', e));
-  }
-  logActivity('notes_saved', '📝 Notes updated');
-  const msg = document.getElementById('notesSaveMsg');
-  if (msg) { msg.style.display = 'flex'; setTimeout(() => msg.style.display='none', 2500); }
-}
-
-function loadNotes() {
-  try {
-    const saved = localStorage.getItem('mc_notes');
-    if (saved) notesData = JSON.parse(saved);
-  } catch(e) {}
-  const ids = { main:'notesMain', event:'nq-event', impact:'nq-impact', treatment:'nq-treatment', priority:'nq-priority' };
-  Object.entries(ids).forEach(([key, id]) => {
-    const el = document.getElementById(id);
-    if (el && notesData[key]) el.value = notesData[key];
-  });
 }
 
 // ── CONTACT MODAL ──
@@ -196,9 +267,9 @@ async function confirmPermanentErase() {
   conditions = [];
   roadmapData = null;
   chatHistory = [];
-  notesData = {};
+  notesData = { entries: [], story: { event:[], impact:[], treatment:[], priority:[] } };
   activityLog = [];
-  try { localStorage.removeItem('mc_notes'); } catch(e) {}
+  try { localStorage.removeItem('mc_notes'); localStorage.removeItem('mc_notes_v2'); } catch(e) {}
   // Delete from Supabase
   if (sbClient && currentUser) {
     try {
@@ -346,6 +417,7 @@ function showPage(id) {
   if (id === 'tracker') renderTrackerTable();
   if (id === 'activity') renderActivityLog();
   if (id === 'profile') renderProfile();
+  if (id === 'records') { updateRecordsStorageBanner(); }
   if (id === 'notes') { loadNotes(); }
 }
 
@@ -982,14 +1054,19 @@ function renderRoadmap(data) {
 function renderCondCard(c, typeColors, typeLabels) {
   const color = typeColors[c.type] || '#002855';
   const label = typeLabels[c.type] || c.type;
+  const dc = getDiagnosticCode(c.name);
+  const cpTips = getCPTips(c.name);
   return `
   <div class="cond-card">
     <div class="cond-card-hdr lborder-${c.type}" onclick="toggleCondBody(this)">
       <div style="flex:1">
         <div class="cond-name">${c.name}</div>
-        <span class="cond-pri-badge badge-${c.type}">${label}</span>
-        ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec);margin-left:6px">↳ Secondary to ${c.secondaryTo}</span>` : ''}
-        ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint);margin-left:8px">${c.cfr}</span>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px">
+          <span class="cond-pri-badge badge-${c.type}">${label}</span>
+          ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec)">↳ Secondary to ${c.secondaryTo}</span>` : ''}
+          ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint)">${c.cfr}</span>` : ''}
+          ${dc ? `<span class="cond-dc-badge">DC ${dc.code}</span>` : ''}
+        </div>
       </div>
       <div class="cond-toggle">▼</div>
     </div>
@@ -1002,11 +1079,96 @@ function renderCondCard(c, typeColors, typeLabels) {
       </div>
       ${c.ratingCriteria?.length ? `
       <div class="rating-criteria">
-        <div class="rating-criteria-hdr">📊 VA Rating Criteria (38 CFR Part 4) — Read and interpret based on your symptoms</div>
-        ${c.ratingCriteria.map(r => `<div class="rating-row"><div class="r-pct">${r.pct}%</div><div class="r-desc">${r.desc}</div></div>`).join('')}
+        <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `Diagnostic Code ${dc.code}` : '38 CFR Part 4'}</div>
+        <div class="rating-criteria-sub">Describe your <strong>worst days</strong> at your C&amp;P exam. The examiner checks which row your symptoms match.</div>
+        ${c.ratingCriteria.map(r => `
+          <div class="rating-row">
+            <div class="r-pct">${r.pct}%</div>
+            <div class="r-desc">
+              <div>${r.desc}</div>
+              ${r.keywords ? `<div class="r-keywords">Key words: ${r.keywords}</div>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
+      ${cpTips?.length ? `
+      <div class="cp-tips-box">
+        <div class="cp-tips-hdr">🎯 C&amp;P Exam Prep — What the examiner is looking for</div>
+        ${cpTips.map(t => `<div class="cp-tip-row">• ${t}</div>`).join('')}
       </div>` : ''}
     </div>
   </div>`;
+}
+
+// Local diagnostic codes lookup
+function getDiagnosticCode(name) {
+  const n = name?.toLowerCase() || '';
+  const codes = {
+    'tinnitus': { code: '6260', cfr: '38 CFR § 4.87' },
+    'ptsd': { code: '9411', cfr: '38 CFR § 4.130' },
+    'asthma': { code: '6602', cfr: '38 CFR § 4.97' },
+    'sleep apnea': { code: '6847', cfr: '38 CFR § 4.97' },
+    'lumbar': { code: '5237', cfr: '38 CFR § 4.71a' },
+    'cervical': { code: '5237', cfr: '38 CFR § 4.71a' },
+    'knee': { code: '5260', cfr: '38 CFR § 4.71a' },
+    'anxiety': { code: '9400', cfr: '38 CFR § 4.130' },
+    'depression': { code: '9434', cfr: '38 CFR § 4.130' },
+    'migraines': { code: '8100', cfr: '38 CFR § 4.124a' },
+    'hypertension': { code: '7101', cfr: '38 CFR § 4.104' },
+    'diabetes': { code: '7913', cfr: '38 CFR § 4.119' },
+    'hearing loss': { code: '6100', cfr: '38 CFR § 4.85' },
+  };
+  for (const key in codes) { if (n.includes(key)) return codes[key]; }
+  return null;
+}
+
+// C&P prep tips per condition
+function getCPTips(name) {
+  const n = name?.toLowerCase() || '';
+  const tips = {
+    'ptsd': [
+      'Describe your worst symptoms — nightmares, flashbacks, hypervigilance, avoidance',
+      'Tell the examiner how PTSD affects your work, relationships, and daily functioning',
+      'Don\'t minimize — describe your bad days, not your average days',
+      'Bring a list of stressors (specific in-service events)',
+    ],
+    'sleep apnea': [
+      'Confirm whether you use a CPAP — using one supports a 50% rating minimum',
+      'Describe daytime sleepiness, difficulty concentrating, and impact on work',
+      'Mention frequency of apnea episodes per hour (from your sleep study)',
+    ],
+    'asthma': [
+      'Bring records of FEV1/FVC ratio from pulmonary function tests',
+      'Describe how often you use inhalers per day and per week',
+      'Tell examiner about any ER visits, hospitalizations, or time off work due to flare-ups',
+    ],
+    'tinnitus': [
+      'Tinnitus is usually rated 10% (single bilateral rating, DC 6260)',
+      'Describe the sound, frequency, and how it affects sleep and concentration',
+      'Note that tinnitus is often rated alongside hearing loss',
+    ],
+    'lumbar': [
+      'ROM (range of motion) is measured — show your actual limited movement, don\'t push through pain',
+      'Describe if you have radiculopathy (pain/numbness shooting into legs)',
+      'Mention flare-ups, how long they last, and what triggers them',
+    ],
+    'knee': [
+      'Walk normally for the examiner — don\'t over-perform',
+      'Describe locking, giving way, and limitation of motion on bad days',
+      'Mention any surgeries, braces, or pain medication',
+    ],
+    'migraines': [
+      'The key rating factor is frequency: how many prostrating attacks per month',
+      'Describe prostrating = you must stop all activity and lie down',
+      'Keep a headache diary showing dates and duration',
+    ],
+    'hypertension': [
+      'Blood pressure readings drive the rating — bring recent records',
+      'A diastolic reading of 100+ gets 20%, 110+ gets 40%',
+      'Describe current medications and any cardiovascular complications',
+    ],
+  };
+  for (const key in tips) { if (n.includes(key)) return tips[key]; }
+  return null;
 }
 
 function toggleCondBody(hdr) {
@@ -1069,7 +1231,9 @@ function renderDashboard() {
         <div class="gauge-legend-item"><div class="gauge-legend-dot" style="background:#C9A84C"></div>Potential ${potentialCombined}%</div>
       </div>
       <div class="gauge-note">
-        ${currentCombined === 0 && wonCount === 0 ? '⏳ No conditions won yet — current rating is 0%. Conditions in the "Won" column with ratings update this gauge.' : ''}
+        ${currentCombined === 0 && wonCount === 0 
+          ? `<div class="gauge-howto">📋 <strong>How to use:</strong> Drag conditions to the <strong>Won</strong> column and enter your VA-assigned rating — the gauge updates automatically.</div>` 
+          : ''}
         ${potentialCombined > 0 ? `📊 If all ${conditions.length} conditions reach target ratings, VA combined math yields <strong>${potentialCombined}%</strong>` : ''}
       </div>
     </div>
@@ -1166,7 +1330,7 @@ function renderKcard(c) {
         <div class="check-box">${ch.done?'✓':''}</div>
         <div class="check-text">${ch.text}</div>
       </div>`).join('')}</div>` : ''}
-    <div class="kcard-hint">⠿ Drag to move column</div>
+    <div class="kcard-hint">⠿ Drag to move · <button class="btn-kcard-edit" onclick="openEditCondition('${c.id}')">Edit</button></div>
   </div>`;
 }
 
@@ -1177,6 +1341,109 @@ function toggleCheck(condId, checkIdx) {
     renderDashboard();
     saveConditions();
   }
+}
+
+function printRoadmap() {
+  if (!roadmapData || !conditions.length) { alert('Complete your screener first to generate a roadmap to print.'); return; }
+  const branch = ans.branch?.[0] || 'Veteran';
+  const mos = ans.mos?.code ? `${ans.mos.code} — ${ans.mos.title||''}` : '';
+  const typeLabels = { direct:'Direct Service', secondary:'Secondary', presumptive:'Presumptive', lay:'Lay Evidence' };
+  const condHTML = conditions.map(c => `
+    <div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:12px;break-inside:avoid">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <strong style="font-size:15px">${c.name}</strong>
+        <span style="font-size:11px;background:#002855;color:white;padding:2px 7px;border-radius:3px">${typeLabels[c.type]||c.type}</span>
+        ${c.secondaryTo ? `<span style="font-size:11px;color:#666">↳ Secondary to ${c.secondaryTo}</span>` : ''}
+        ${c.cfr ? `<span style="font-size:10px;color:#999">${c.cfr}</span>` : ''}
+      </div>
+      ${c.nexus ? `<div style="margin-bottom:6px"><strong style="color:#0050A0;font-size:11px">NEXUS:</strong> ${c.nexus}</div>` : ''}
+      ${c.evidence_have ? `<div style="margin-bottom:6px"><strong style="color:#16A34A;font-size:11px">HAVE:</strong> ${c.evidence_have}</div>` : ''}
+      ${c.evidence_need ? `<div style="margin-bottom:6px"><strong style="color:#DC2626;font-size:11px">NEED:</strong> ${c.evidence_need}</div>` : ''}
+      ${c.action ? `<div style="margin-bottom:6px"><strong style="color:#0050A0;font-size:11px">ACTION:</strong> ${c.action}</div>` : ''}
+      ${c.ratingCriteria?.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee">
+        <div style="font-size:11px;font-weight:700;color:#002855;margin-bottom:6px">VA RATING CRITERIA (38 CFR Part 4)</div>
+        ${c.ratingCriteria.map(r => `<div style="display:flex;gap:8px;margin-bottom:4px;font-size:12px"><span style="min-width:32px;font-weight:700;color:#002855">${r.pct}%</span><span>${r.desc}</span></div>`).join('')}
+      </div>` : ''}
+    </div>`).join('');
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html><head><title>VA Disability Roadmap — Mission: Connected</title>
+    <style>body{font-family:Arial,sans-serif;max-width:740px;margin:30px auto;color:#1a1a2e;font-size:13px;line-height:1.5}
+    h1{color:#002855;font-size:22px;margin-bottom:4px}
+    h2{color:#002855;font-size:13px;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;border-bottom:2px solid #002855;padding-bottom:4px}
+    .meta{color:#666;font-size:12px;margin-bottom:20px}
+    .disclaimer{font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:24px;padding-top:10px;line-height:1.5}
+    @media print{body{margin:15px}button{display:none}}</style></head><body>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+      <div style="background:#002855;color:white;font-size:14px;padding:6px 10px;border-radius:4px;font-weight:700">M·C</div>
+      <h1>Mission: Connected — VA Disability Roadmap</h1>
+    </div>
+    <div class="meta">${branch} Veteran · ${mos} · ${ans.startYear||'?'}–${ans.endYear||'Present'} · Generated ${new Date().toLocaleDateString()}</div>
+    <button onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;background:#002855;color:white;border:none;border-radius:4px;cursor:pointer">🖨️ Print / Save as PDF</button>
+    <h2>Summary</h2>
+    <p>${roadmapData.summary || ''}</p>
+    <h2>${conditions.length} Conditions Identified</h2>
+    ${condHTML}
+    <div class="disclaimer">⚠️ This roadmap is AI-generated for educational and informational purposes only. It does not constitute legal or medical advice. Mission: Connected is not affiliated with the U.S. Department of Veterans Affairs. Consult an accredited VSO or VA attorney for formal representation.</div>
+  </body></html>`);
+  win.document.close();
+}
+
+function openEditCondition(condId) {
+  const c = conditions.find(c => c.id === condId);
+  if (!c) return;
+  document.getElementById('editCondId').value = condId;
+  document.getElementById('editCondName').value = c.name || '';
+  document.getElementById('editCondBasis').value = c.type || 'direct';
+  document.getElementById('editCondStatus').value = c.col || 'todo';
+  document.getElementById('editCondRating').value = c.rating || 0;
+  document.getElementById('editCondTargetRating').value = c.targetRating || 0;
+  document.getElementById('editCondNotes').value = c.notes || '';
+  document.getElementById('editCondSecondaryTo').value = c.secondaryTo || '';
+  toggleEditSecondaryField(c.type);
+  document.getElementById('editModal').classList.add('active');
+}
+
+function toggleEditSecondaryField(val) {
+  const f = document.getElementById('editSecondaryToField');
+  if (f) f.style.display = val === 'secondary' ? 'block' : 'none';
+}
+
+function saveEditCondition() {
+  const id = document.getElementById('editCondId').value;
+  const c = conditions.find(c => c.id === id);
+  if (!c) return;
+  const oldSnap = { ...c };
+  c.name = document.getElementById('editCondName').value.trim() || c.name;
+  c.type = document.getElementById('editCondBasis').value;
+  c.col = document.getElementById('editCondStatus').value;
+  c.rating = parseInt(document.getElementById('editCondRating').value) || 0;
+  c.targetRating = parseInt(document.getElementById('editCondTargetRating').value) || 0;
+  c.notes = document.getElementById('editCondNotes').value.trim();
+  c.secondaryTo = c.type === 'secondary' ? document.getElementById('editCondSecondaryTo').value.trim() : '';
+  logActivity('condition_edited', `✏️ Edited: ${c.name}`, () => {
+    Object.assign(c, oldSnap); renderDashboard(); renderTrackerTable();
+  });
+  closeModal('editModal');
+  renderDashboard();
+  renderTrackerTable();
+  saveConditions();
+}
+
+function deleteConditionFromEdit() {
+  const id = document.getElementById('editCondId').value;
+  const c = conditions.find(c => c.id === id);
+  if (!c) return;
+  if (!confirm(`Delete "${c.name}" from your claim? This cannot be undone from the edit screen.`)) return;
+  const snap = conditions.slice();
+  conditions = conditions.filter(c => c.id !== id);
+  logActivity('condition_deleted', `🗑️ Deleted: ${c.name}`, () => {
+    conditions = snap; renderDashboard(); renderTrackerTable();
+  });
+  closeModal('editModal');
+  renderDashboard();
+  renderTrackerTable();
+  saveConditions();
 }
 
 function advanceCondition(condId) {
@@ -1354,9 +1621,17 @@ function initChat() {
   if (!msgs) return;
   msgs.innerHTML = '';
   chatHistory = [];
-  // brief intro with slight delay
   setTimeout(() => {
-    const intro = `Hey. I'm Aylene. Here to help with your VA claim — ask me anything.`;
+    let intro;
+    if (roadmapData && conditions.length > 0) {
+      const branch = ans.branch?.[0] || 'your branch';
+      const mos = ans.mos?.code ? `${ans.mos.code} ${ans.mos.title || ''}`.trim() : null;
+      const topCond = conditions.find(c => c.priority === 'high') || conditions[0];
+      const condList = conditions.map(c => c.name).join(', ');
+      intro = `Hey — I've got your roadmap in front of me. ${conditions.length} condition${conditions.length > 1 ? 's' : ''} identified${mos ? ` for a ${branch} ${mos}` : ''}: ${condList}.\n\n${topCond ? `Your strongest starting point is likely **${topCond.name}** — want me to walk you through what a C&P exam looks like for that, or what evidence you'll need?` : 'Ask me anything about your claim, evidence, ratings, or next steps.'}`;
+    } else {
+      intro = `Hey — I'm Aylene, your VA claims advisor. Complete the screener to build your roadmap and I'll know exactly which claims to focus on. Or ask me anything about the VA process right now.`;
+    }
     appendMsg('ai', intro);
     chatHistory.push({ role: 'assistant', content: intro });
   }, 800);
@@ -1420,9 +1695,7 @@ async function sendMessage() {
   const context = roadmapData
     ? `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')}`
     : '';
-  const notesCtx = notesData.main || notesData.event || notesData.priority
-    ? `\nVeteran's personal notes: ${notesData.main||''} Event: ${notesData.event||''} Priority: ${notesData.priority||''}`
-    : '';
+  const notesCtx = buildNotesContext();
 
   try {
     const messages = [
@@ -1459,6 +1732,18 @@ function handleFileSelect(e) {
   });
 }
 
+function updateRecordsStorageBanner() {
+  const el = document.getElementById('recordsStorageBanner');
+  if (!el) return;
+  if (currentUser) {
+    el.innerHTML = `<span class="records-banner-icon">🔒</span><span><strong>Encrypted cloud storage active.</strong> Your files are stored securely in your private account — accessible only to you. Files are never shared with any third party.</span>`;
+    el.className = 'records-storage-banner records-banner-secure';
+  } else {
+    el.innerHTML = `<span class="records-banner-icon">⚠️</span><span><strong>Guest mode:</strong> Files are stored in your browser memory only and will be lost when you close or refresh this tab. <button class="btn-link-inline" onclick="openAuth('signup')">Create a free account →</button> to save your records permanently.</span>`;
+    el.className = 'records-storage-banner records-banner-guest';
+  }
+}
+
 function renderFiles() {
   const list = document.getElementById('fileList');
   if (!list) return;
@@ -1470,8 +1755,8 @@ function renderFiles() {
     return `<div class="file-item" id="fi-${f.id}">
       <div class="file-item-icon">${icon}</div>
       <div style="flex:1;min-width:0">
-        <div class="file-item-name-wrap">
-          <a class="file-item-name" id="fname-${f.id}" href="${blobUrl}" target="_blank" title="Open file">${f.displayName}</a>
+        <div class="file-item-name-wrap" id="fwrap-${f.id}">
+          <a class="file-item-name" href="${blobUrl}" target="_blank" title="Open file">${f.displayName}</a>
           <button class="btn-rename" onclick="startRename('${f.id}')" title="Rename">✏️</button>
         </div>
         <div class="file-item-meta">${size} MB · ${f.file.type || 'document'} · <a href="${blobUrl}" download="${f.displayName}" style="color:var(--sky);font-size:11px">Download ↓</a></div>
@@ -1486,15 +1771,25 @@ function renderFiles() {
 function startRename(id) {
   const f = uploadedFiles.find(f => f.id === id);
   if (!f) return;
-  const nameEl = document.getElementById('fname-' + id);
+  const wrap = document.getElementById('fwrap-' + id);
+  if (!wrap) return;
   const current = f.displayName;
-  nameEl.innerHTML = `<input class="file-rename-input" value="${current}" onblur="finishRename('${id}',this.value)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${current}';this.blur();}">`;
-  nameEl.querySelector('input').select();
+  wrap.innerHTML = `<input class="file-rename-input" id="ri-${id}" value="${current}">
+    <button class="btn-rename-ok" onclick="finishRename('${id}', document.getElementById('ri-${id}').value)">✓</button>
+    <button class="btn-rename-cancel" onclick="renderFiles()">✕</button>`;
+  const input = document.getElementById('ri-' + id);
+  if (input) {
+    input.focus(); input.select();
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') finishRename(id, input.value);
+      if (e.key === 'Escape') renderFiles();
+    });
+  }
 }
 
 function finishRename(id, newName) {
   const f = uploadedFiles.find(f => f.id === id);
-  if (!f || !newName.trim()) { renderFiles(); return; }
+  if (!f || !newName?.trim()) { renderFiles(); return; }
   const oldName = f.displayName;
   f.displayName = newName.trim();
   logActivity('file_renamed', `✏️ Renamed: "${oldName}" → "${newName.trim()}"`, () => {
@@ -1506,53 +1801,52 @@ function finishRename(id, newName) {
 async function analyzeFileWithAylene(id) {
   const f = uploadedFiles.find(f => f.id === id);
   if (!f) return;
-  showPage('chat');
-  if (chatHistory.length === 0) initChat();
+  // Navigate to chat first, wait for it to be ready
+  if (currentPage !== 'chat') {
+    showPage('chat');
+    await new Promise(r => setTimeout(r, 1200)); // let initChat settle
+  }
+  if (chatHistory.length === 0) await new Promise(r => setTimeout(r, 800));
   // Read file content
   const reader = new FileReader();
   reader.onload = async (e) => {
     const content = e.target.result;
     const isPDF = f.file.type.includes('pdf');
     const isImage = f.file.type.includes('image');
-    setTimeout(async () => {
-      const userMsg = `Please analyze this document for me: "${f.displayName}"`;
-      appendMsg('user', userMsg);
-      const delay = 1500 + Math.random() * 2000;
-      await new Promise(r => setTimeout(r, delay));
-      showTyping();
-      try {
-        let messages;
-        if (isImage) {
-          // Send as image to Claude vision
-          const base64 = content.split(',')[1];
-          const mtype = f.file.type;
-          messages = [
-            ...chatHistory.slice(-6),
-            { role: 'user', content: [
-              { type: 'image', source: { type: 'base64', media_type: mtype, data: base64 } },
-              { type: 'text', text: `This veteran uploaded a document called "${f.displayName}". Please analyze it in the context of their VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable. Summarize what you find and give specific next steps.` }
-            ]}
-          ];
-        } else {
-          // Text-based - extract text content
-          const textContent = typeof content === 'string' ? content.substring(0, 8000) : '[Binary file - cannot read text]';
-          messages = [
-            ...chatHistory.slice(-6),
-            { role: 'user', content: `I'm uploading a document called "${f.displayName}". Here's the text content:\n\n${textContent}\n\nPlease analyze this for my VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable.` }
-          ];
-        }
-        const context = `Veteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')||'None yet'}`;
-        const data = await callClaude(messages, 1000, AYLENE_SYSTEM + '\n' + context);
-        hideTyping();
-        const reply = data.content?.[0]?.text || "I wasn't able to read that file. Try copying key text and pasting it directly in the chat.";
-        appendMsg('ai', reply);
-        chatHistory.push({ role: 'user', content: userMsg });
-        chatHistory.push({ role: 'assistant', content: reply });
-      } catch(err) {
-        hideTyping();
-        appendMsg('ai', `I had trouble reading that file. You can copy and paste key sections directly into the chat and I'll analyze them for you.`);
+    const userMsg = `Please analyze this document for me: "${f.displayName}"`;
+    appendMsg('user', userMsg);
+    chatHistory.push({ role: 'user', content: userMsg });
+    showTyping();
+    await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
+    try {
+      let messages;
+      if (isImage) {
+        const base64 = content.split(',')[1];
+        const mtype = f.file.type;
+        messages = [
+          ...chatHistory.slice(-6, -1),
+          { role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: mtype, data: base64 } },
+            { type: 'text', text: `This veteran uploaded a document called "${f.displayName}". Analyze it in the context of their VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable. Summarize and give specific next steps.` }
+          ]}
+        ];
+      } else {
+        const textContent = typeof content === 'string' ? content.substring(0, 8000) : '[Binary file — cannot extract text]';
+        messages = [
+          ...chatHistory.slice(-6, -1),
+          { role: 'user', content: `I uploaded a document called "${f.displayName}". Text content:\n\n${textContent}\n\nAnalyze this for my VA disability claim. Look for: denial reasons, favorable concessions, missing evidence, rated/denied conditions, C&P findings, and actionable next steps.` }
+        ];
       }
-    }, 400);
+      const context = `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'}, Conditions: ${conditions.map(c=>c.name).join(', ')||'None yet'}`;
+      const data = await callClaude(messages, 1000, AYLENE_SYSTEM + context);
+      hideTyping();
+      const reply = data.content?.[0]?.text || "I wasn't able to read that file. Try copying key text and pasting it into the chat directly.";
+      appendMsg('ai', reply);
+      chatHistory.push({ role: 'assistant', content: reply });
+    } catch(err) {
+      hideTyping();
+      appendMsg('ai', `I had trouble reading that file. You can copy and paste key sections directly into the chat and I'll analyze them for you.`);
+    }
   };
   if (f.file.type.includes('image')) {
     reader.readAsDataURL(f.file);
