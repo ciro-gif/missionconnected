@@ -849,3 +849,11 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .rp-custom-input{width:72px;border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-size:16px;font-weight:700;color:var(--navy);text-align:center;font-family:var(--font-display);}
 .rp-custom-input:focus{outline:none;border-color:var(--sky);}
 .rp-custom-pct{font-size:16px;font-weight:700;color:var(--text-sec);}
+
+/* ── 38 CFR § 4.96 NOTICE IN GAUGE ── */
+.gauge-496-notice{background:#FEF3C7;border:1px solid #F59E0B;border-radius:var(--r);padding:10px 12px;font-size:11px;color:#78350F;line-height:1.7;margin-top:8px;text-align:left;}
+.gauge-496-notice strong{color:#92400E;}
+
+/* ── § 4.96 WARN IN CALCULATOR ── */
+.calc-496-warn{background:#FEF3C7;border:1px solid #F59E0B;border-radius:var(--r);padding:10px 12px;font-size:11px;color:#78350F;line-height:1.7;margin-top:10px;}
+.calc-496-warn strong{color:#92400E;}
