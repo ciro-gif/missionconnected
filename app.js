@@ -188,17 +188,17 @@ async function checkNetworkStatus() {
     networkOk = res.ok || res.status === 529; // 529 = overloaded but reachable
     const sbOk = !!sbClient;
     if (res.ok) {
-      dot.style.background = '#16A34A'; label.textContent = 'All Systems Online';
+      dot.style.background = '#16A34A'; label.textContent = 'Online';
     } else if (res.status === 429) {
-      dot.style.background = '#F59E0B'; label.textContent = 'AI Rate Limited';
+      dot.style.background = '#F59E0B'; label.textContent = 'Rate Limited';
     } else if (res.status === 529) {
-      dot.style.background = '#F59E0B'; label.textContent = 'AI Overloaded';
+      dot.style.background = '#F59E0B'; label.textContent = 'Overloaded';
     } else {
       dot.style.background = '#DC2626'; label.textContent = 'AI Offline';
     }
     if (!sbOk) { dot.style.background = '#F59E0B'; label.textContent = 'DB Offline'; }
   } catch(e) {
-    dot.style.background = '#DC2626'; label.textContent = 'Network Error';
+    dot.style.background = '#DC2626'; label.textContent = 'No Network';
   }
 }
 
@@ -919,8 +919,9 @@ Diagnoses:${ans.diagnoses?.join(',')||'None'}
 Events:${ans.events?.join(',')||'None'}
 
 Return this JSON with 2-4 conditions only:
-{"summary":"1-2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","nexus":"1 sentence","evidence_have":"brief","evidence_need":"brief","action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"1 sentence"}
+{"summary":"1-2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","targetRating":N,"nexus":"1 sentence","evidence_have":"brief","evidence_need":"brief","action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"1 sentence"}
 
+targetRating = realistic VA rating based on reported symptoms (not minimum — use actual diagnostic criteria: e.g. CPAP for sleep apnea=50, daily bronchodilator=30 for asthma, tinnitus always=10).
 Be specific to MOS. Winnable claims only. MINIFIED JSON ONLY.`;
 
   try {
@@ -945,6 +946,7 @@ Be specific to MOS. Winnable claims only. MINIFIED JSON ONLY.`;
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
       nexus: c.nexus, evidence_need: c.evidence_need, action: c.action,
       secondaryTo: c.secondaryTo||'', cfr: c.cfr||'',
+      targetRating: c.targetRating || 0,
       ratingCriteria: c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name)
     })) || [];
 
@@ -1190,7 +1192,7 @@ function renderDashboard() {
 
   // Real VA math: current = won conditions with ratings, potential = all at target ratings
   const wonRatings = conditions.filter(c => c.col === 'won' && c.rating > 0).map(c => c.rating);
-  const allTargetRatings = conditions.map(c => c.targetRating || c.rating || 10).filter(r => r > 0);
+  const allTargetRatings = conditions.map(c => c.targetRating || c.rating || 0).filter(r => r > 0);
   const currentCombined = wonRatings.length ? vaWholePerson(wonRatings) : 0;
   const potentialCombined = allTargetRatings.length ? vaWholePerson(allTargetRatings) : 0;
   const pendingCount = conditions.filter(c => c.col === 'todo' || c.col === 'inprog').length;
@@ -1293,14 +1295,68 @@ function dropOnCol(newCol, event) {
     c.col = prevCol; renderDashboard();
   });
   if (newCol === 'won' && !c.rating) {
-    setTimeout(() => {
-      const r = prompt(`What rating did VA assign for ${c.name}? (enter 0–100)`);
-      if (r !== null) { c.rating = parseInt(r) || 0; renderDashboard(); saveConditions(); }
-    }, 300);
+    setTimeout(() => openRatingPicker(c.id), 300);
   }
   renderDashboard();
   saveConditions();
   dragCondId = null;
+}
+
+let ratingPickerCondId = null;
+
+function openRatingPicker(condId) {
+  const c = conditions.find(c => c.id === condId);
+  if (!c) return;
+  ratingPickerCondId = condId;
+  document.getElementById('ratingPickerTitle').textContent = `🏆 ${c.name} — Enter VA Rating`;
+  document.getElementById('ratingPickerSub').textContent = `Select the % VA assigned you, or the row that best matches your symptoms`;
+  document.getElementById('ratingCustomInput').value = '';
+
+  const criteria = c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name);
+  const opts = document.getElementById('ratingPickerOptions');
+  opts.innerHTML = criteria.map(r => `
+    <div class="rp-option" onclick="selectRatingOption(this, ${r.pct})">
+      <div class="rp-opt-pct">${r.pct}%</div>
+      <div class="rp-opt-desc">${r.desc}</div>
+    </div>`).join('');
+
+  document.getElementById('ratingPickerModal').classList.add('active');
+}
+
+function selectRatingOption(el, pct) {
+  document.querySelectorAll('.rp-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('ratingCustomInput').value = pct;
+}
+
+function closeRatingPicker() {
+  // If they cancel, move condition back to filed (last step before won)
+  const c = conditions.find(c => c.id === ratingPickerCondId);
+  if (c && c.col === 'won' && !c.rating) {
+    c.col = 'filed';
+    renderDashboard();
+    saveConditions();
+  }
+  document.getElementById('ratingPickerModal').classList.remove('active');
+  ratingPickerCondId = null;
+}
+
+function confirmRatingPick() {
+  const val = parseInt(document.getElementById('ratingCustomInput').value);
+  if (!val && val !== 0) { 
+    document.getElementById('ratingCustomInput').focus();
+    document.getElementById('ratingCustomInput').style.borderColor = '#DC2626';
+    return; 
+  }
+  const c = conditions.find(c => c.id === ratingPickerCondId);
+  if (c) {
+    c.rating = Math.min(100, Math.max(0, val));
+    logActivity('rating_entered', `🏆 ${c.name} won at ${c.rating}%`);
+    renderDashboard();
+    saveConditions();
+  }
+  document.getElementById('ratingPickerModal').classList.remove('active');
+  ratingPickerCondId = null;
 }
 
 function renderKcard(c) {
