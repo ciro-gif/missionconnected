@@ -670,8 +670,57 @@ function vaWholePerson(ratings) {
     remaining = remaining * (1 - r / 100);
   }
   const combined = 100 - remaining;
-  // VA rounds to nearest 10%, with 0.5 rounding UP
   return Math.round(combined / 10) * 10;
+}
+
+// 38 CFR § 4.96(a) — respiratory conditions that CANNOT be separately rated
+// VA assigns only the SINGLE HIGHEST (predominant) rating among these conditions
+const RESPIRATORY_4_96_KEYWORDS = [
+  'asthma','sleep apnea','apnea','copd','emphysema','bronchitis','bronchiectasis',
+  'pulmonary fibrosis','interstitial lung','respiratory','pulmonary','pneumoconiosis',
+  'silicosis','asbestosis','pleuritis','pleural'
+];
+
+function isRespiratoryCondition(name) {
+  const n = (name || '').toLowerCase();
+  return RESPIRATORY_4_96_KEYWORDS.some(k => n.includes(k));
+}
+
+// Returns { combined, respiratoryNote, respiratoryPredominant }
+// Applies 38 CFR § 4.96: respiratory conditions get ONE rating (the highest).
+// That single rating is then combined with non-respiratory ratings using VA math.
+function vaRatingWith4_96(conditionList) {
+  if (!conditionList || conditionList.length === 0) return { combined: 0, respiratoryNote: null };
+
+  const ratings = conditionList.map(c => ({
+    name: c.name,
+    rating: c.rating || c.targetRating || 0,
+    isResp: isRespiratoryCondition(c.name)
+  })).filter(c => c.rating > 0);
+
+  const respGroup = ratings.filter(c => c.isResp).sort((a,b) => b.rating - a.rating);
+  const nonResp   = ratings.filter(c => !c.isResp);
+
+  // Respiratory group: ONLY the highest rating counts (§ 4.96 predominant rule)
+  const respPredominant = respGroup[0] || null;
+  const allRatings = [];
+  if (respPredominant) allRatings.push(respPredominant.rating);
+  nonResp.forEach(c => allRatings.push(c.rating));
+
+  const combined = vaWholePerson(allRatings);
+
+  let respiratoryNote = null;
+  if (respGroup.length > 1) {
+    const bundled = respGroup.slice(1).map(c => c.name).join(', ');
+    respiratoryNote = {
+      predominant: respPredominant.name,
+      predominantRating: respPredominant.rating,
+      bundled,
+      law: '38 CFR § 4.96(a)'
+    };
+  }
+
+  return { combined, respiratoryNote, respiratoryPredominant: respPredominant };
 }
 
 function updateCalc() {
@@ -713,7 +762,8 @@ function updateMultiCalc() {
       <div>Raw combined: <strong>${rawCombined.toFixed(1)}%</strong></div>
       <div>VA rounds to nearest 10%: <strong class="calc-final">${rounded}%</strong></div>
       ${rounded >= 100 ? '<div class="calc-note-100">🏆 100% combined rating!</div>' : ''}
-    </div>`;
+    </div>
+    <div class="calc-496-warn">⚠️ <strong>38 CFR § 4.96 note:</strong> If any of these conditions are both respiratory (e.g. asthma + sleep apnea + COPD), VA will award only the <em>single highest</em> respiratory rating — not combine them. This calculator shows standard VA math only. Your Case Dashboard applies the correct rule automatically.</div>`;
 }
 
 // ── SCREENER ──
@@ -1190,11 +1240,16 @@ function renderDashboard() {
   const start = ans.startYear || '?';
   const end = ans.endYear || 'Present';
 
-  // Real VA math: current = won conditions with ratings, potential = all at target ratings
-  const wonRatings = conditions.filter(c => c.col === 'won' && c.rating > 0).map(c => c.rating);
-  const allTargetRatings = conditions.map(c => c.targetRating || c.rating || 0).filter(r => r > 0);
-  const currentCombined = wonRatings.length ? vaWholePerson(wonRatings) : 0;
-  const potentialCombined = allTargetRatings.length ? vaWholePerson(allTargetRatings) : 0;
+  // ── VA RATING MATH ──
+  // Current: won conditions only, applying 38 CFR § 4.96 respiratory bundling
+  const wonConds = conditions.filter(c => c.col === 'won' && c.rating > 0);
+  const allTargetConds = conditions.map(c => ({ ...c, rating: c.targetRating || c.rating || 0 })).filter(c => c.rating > 0);
+
+  const currentResult  = vaRatingWith4_96(wonConds);
+  const potentialResult = vaRatingWith4_96(allTargetConds);
+
+  const currentCombined  = currentResult.combined;
+  const potentialCombined = potentialResult.combined;
   const pendingCount = conditions.filter(c => c.col === 'todo' || c.col === 'inprog').length;
   const wonCount = conditions.filter(c => c.col === 'won').length;
 
@@ -1236,7 +1291,15 @@ function renderDashboard() {
         ${currentCombined === 0 && wonCount === 0 
           ? `<div class="gauge-howto">📋 <strong>How to use:</strong> Drag conditions to the <strong>Won</strong> column and enter your VA-assigned rating — the gauge updates automatically.</div>` 
           : ''}
-        ${potentialCombined > 0 ? `📊 If all ${conditions.length} conditions reach target ratings, VA combined math yields <strong>${potentialCombined}%</strong>` : ''}
+        ${potentialCombined > 0 ? `📊 Potential combined rating: <strong>${potentialCombined}%</strong>` : ''}
+        ${potentialResult.respiratoryNote ? `
+        <div class="gauge-496-notice">
+          ⚠️ <strong>38 CFR § 4.96(a) Applied:</strong> <em>${potentialResult.respiratoryNote.bundled}</em> cannot be rated separately from <em>${potentialResult.respiratoryNote.predominant}</em> because they are both respiratory conditions. VA awards only the highest rating — <strong>${potentialResult.respiratoryNote.predominantRating}%</strong> for ${potentialResult.respiratoryNote.predominant}. <a href="#" onclick="showPage('regulations');return false;" style="color:var(--sky)">Learn more →</a>
+        </div>` : ''}
+        ${currentResult.respiratoryNote ? `
+        <div class="gauge-496-notice">
+          ⚠️ <strong>38 CFR § 4.96(a):</strong> Your won ratings include multiple respiratory conditions. VA will rate only the predominant one — <em>${currentResult.respiratoryNote.predominant}</em> at <strong>${currentResult.respiratoryNote.predominantRating}%</strong>. ${currentResult.respiratoryNote.bundled} is bundled into this rating, not added separately.
+        </div>` : ''}
       </div>
     </div>
     <div class="service-profile">
@@ -2003,6 +2066,31 @@ const REGS = [
         </ul>
         <h3>The Benefit of the Doubt Rule</h3>
         <p>When evidence for and against a claim is approximately equal, VA must resolve the issue in your favor. This is one of the most important principles in VA law.</p>` },
+      { code: '38 CFR § 4.96(a)', title: 'Respiratory Conditions — Single Rating Rule', content: `
+        <p class="reg-intro">Veterans with multiple respiratory conditions cannot receive separate combined ratings for each one. VA awards only a single rating — for the most severe (predominant) condition.</p>
+        <h3>How It Works</h3>
+        <div class="reg-list">
+          <div class="reg-item"><div class="reg-num">1</div><div>VA identifies all service-connected respiratory conditions</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div>The condition with the <strong>highest rating</strong> becomes the "predominant disability"</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div>Only that single rating is awarded — other respiratory conditions are bundled into it, not added</div></div>
+        </div>
+        <h3>Common Example</h3>
+        <p>Asthma at 30% + Sleep Apnea at 50% = <strong>50% total</strong> (not 65% combined). Sleep apnea is predominant; asthma is bundled.</p>
+        <h3>Conditions Subject to § 4.96</h3>
+        <ul class="reg-bullets">
+          <li>Asthma (DC 6602) and Sleep Apnea (DC 6847) — cannot be separately rated</li>
+          <li>COPD, emphysema, bronchitis, bronchiectasis — all bundled with predominant condition</li>
+          <li>Pulmonary fibrosis, interstitial lung disease — same rule applies</li>
+          <li><strong>Exception:</strong> Sinusitis and rhinitis CAN be rated separately from other respiratory conditions</li>
+        </ul>
+        <h3>The Urban Exception</h3>
+        <p>Per <em>Urban v. Shulkin</em> (2017): if symptoms from the non-predominant condition are disabling enough to reach the <strong>next higher rating level</strong> of the predominant condition's diagnostic code, VA must consider elevating the rating. You cannot get two separate ratings, but you may argue for a higher single rating.</p>
+        <h3>Strategy</h3>
+        <ul class="reg-bullets">
+          <li>File for both conditions — having both service-connected is still valuable for SMC and future claims</li>
+          <li>If sleep apnea (50%) is predominant, ask whether your asthma symptoms push you to the 60% or higher criteria under DC 6847</li>
+          <li>Consult an accredited VSO or VA attorney if you believe your combined respiratory disability warrants a higher single rating</li>
+        </ul>` },
       { code: '38 CFR § 4.16', title: 'TDIU — Total Disability (Individual Unemployability)', content: `
         <p class="reg-intro">TDIU allows you to receive 100% compensation even if your combined rating is below 100%, if your disabilities prevent substantially gainful employment.</p>
         <h3>Eligibility Thresholds</h3>
