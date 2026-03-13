@@ -1467,14 +1467,22 @@ async function saveConditions() {
   if (!sbClient || !currentUser) return;
   try {
     for (const c of conditions) {
+      const payload = {
+        user_id: currentUser.id,
+        name: c.name,
+        rating: c.rating || 0,
+        col: c.col,
+        type: c.type || 'direct',
+        checks: c.checks || [],
+        secondary_to: c.secondaryTo || null,
+        target_rating: c.targetRating || 0,
+        notes: c.notes || null
+      };
       if (c.id?.startsWith('local-')) {
-        const { data } = await sbClient.from('claims').insert({
-          user_id: currentUser.id, name: c.name, rating: c.rating||0,
-          col: c.col, type: c.type, checks: c.checks
-        }).select().single();
+        const { data } = await sbClient.from('claims').insert(payload).select().single();
         if (data) c.id = data.id;
       } else {
-        await sbClient.from('claims').update({ col: c.col, checks: c.checks, rating: c.rating }).eq('id', c.id);
+        await sbClient.from('claims').update(payload).eq('id', c.id);
       }
     }
   } catch(e) { console.warn('Save conditions error:', e); }
