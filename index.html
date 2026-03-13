@@ -647,7 +647,7 @@
         <div class="pg-hdr">
           <div><div class="pg-title">My Claim Roadmap</div><div class="pg-sub" id="roadmapSub">Personalized from your screening answers</div></div>
           <div style="display:flex;gap:8px" class="no-print">
-            <button class="btn btn-outline" onclick="requireAuth(()=>window.print())">🖨️ Print</button>
+            <button class="btn btn-outline" onclick="printRoadmap()">🖨️ Print</button>
             <button class="btn btn-gold" onclick="requireAuth(()=>showPage('chat'))">💬 Ask Aylene</button>
           </div>
         </div>
@@ -710,6 +710,7 @@
         <div class="pg-hdr">
           <div><div class="pg-title">My Records</div><div class="pg-sub">Securely stored — AI analyzes on request</div></div>
         </div>
+        <div class="records-storage-banner" id="recordsStorageBanner"></div>
         <div class="upload-zone" id="uploadZone">
           <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleFileSelect(event)">
           <div class="upload-zone-icon">📁</div>
@@ -755,37 +756,60 @@
       <!-- NOTES -->
       <div class="page" id="page-notes">
         <div class="pg-hdr">
-          <div><div class="pg-title">My Notes &amp; Context</div><div class="pg-sub">Private notes and additional context — Aylene reads these when you chat</div></div>
-          <button class="btn btn-primary" onclick="saveNotes()">💾 Save Notes</button>
+          <div><div class="pg-title">My Notes &amp; Context</div><div class="pg-sub">Private — Aylene reads your entries when you chat</div></div>
         </div>
         <div class="notes-layout">
+
+          <!-- LEFT: FREE NOTES LOG -->
           <div class="notes-card">
             <div class="notes-card-hdr">📝 My Notes</div>
-            <div class="notes-card-sub">Reminders, goals, anything you want to remember. Aylene considers these when helping you.</div>
-            <textarea class="notes-ta" id="notesMain" placeholder="e.g. Doctor appointment May 14th... Ask about nexus letters for sleep apnea... Call DAV office next week..."></textarea>
+            <div class="notes-card-sub">Reminders, goals, anything you want to track. Each entry is logged with a timestamp.</div>
+            <div class="notes-compose">
+              <textarea class="notes-compose-ta" id="noteCompose" placeholder="e.g. Doctor appointment May 14th… Call DAV next week… Ask Aylene about nexus letters…" rows="3"></textarea>
+              <button class="btn-note-add" onclick="addNoteEntry()">＋ Add Note</button>
+            </div>
+            <div class="notes-log" id="noteLog"><div class="notes-empty">No notes yet. Add your first one above.</div></div>
           </div>
+
+          <!-- RIGHT: SERVICE STORY Q&A LOG -->
           <div class="notes-card">
             <div class="notes-card-hdr">📖 My Service Story</div>
-            <div class="notes-card-sub">Your answers help Aylene give more personalized, accurate guidance. Share only what you're comfortable with.</div>
-            <div class="notes-q-item">
-              <label class="notes-q-label">Describe the in-service event or exposure that caused your condition(s). Where were you, what happened, when?</label>
-              <textarea class="notes-q-ta" id="nq-event" placeholder="e.g. During CBRN training at Fort Campbell in 2017, we worked with live chemical agents. I noticed breathing issues within weeks..."></textarea>
+            <div class="notes-card-sub">Answer at your own pace. Aylene uses your entries to give more accurate, personalized guidance.</div>
+
+            <div class="story-question">
+              <div class="story-q-label">🎖️ In-Service Event / Exposure</div>
+              <div class="story-q-prompt">What happened during service that caused your condition(s)? Where, when, what?</div>
+              <textarea class="notes-compose-ta" id="sq-event" placeholder="e.g. During CBRN training at Fort Campbell in 2017, we worked with live agents without proper decon. Breathing issues started within weeks..." rows="2"></textarea>
+              <button class="btn-note-add" onclick="addStoryEntry('event')">＋ Add Entry</button>
+              <div class="story-log" id="slog-event"></div>
             </div>
-            <div class="notes-q-item">
-              <label class="notes-q-label">How do your condition(s) affect your daily life, work, or relationships today?</label>
-              <textarea class="notes-q-ta" id="nq-impact" placeholder="e.g. Have to stop physical activity due to shortness of breath. Can't sleep more than 3–4 hours. Mood changes affecting my family..."></textarea>
+
+            <div class="story-question">
+              <div class="story-q-label">📉 Daily Life Impact</div>
+              <div class="story-q-prompt">How do your condition(s) affect work, relationships, or daily routine today?</div>
+              <textarea class="notes-compose-ta" id="sq-impact" placeholder="e.g. Can't complete physical tasks, sleep disrupted most nights, mood changes affecting my family..." rows="2"></textarea>
+              <button class="btn-note-add" onclick="addStoryEntry('impact')">＋ Add Entry</button>
+              <div class="story-log" id="slog-impact"></div>
             </div>
-            <div class="notes-q-item">
-              <label class="notes-q-label">What medical treatment have you received? What have doctors said?</label>
-              <textarea class="notes-q-ta" id="nq-treatment" placeholder="e.g. Primary care prescribed an inhaler in 2021. VA confirmed asthma at last visit but didn't service-connect it..."></textarea>
+
+            <div class="story-question">
+              <div class="story-q-label">🏥 Medical Treatment</div>
+              <div class="story-q-prompt">What treatment have you received? What have doctors said about your condition?</div>
+              <textarea class="notes-compose-ta" id="sq-treatment" placeholder="e.g. VA prescribed inhaler 2021, confirmed asthma but didn't service-connect. Sleep study pending..." rows="2"></textarea>
+              <button class="btn-note-add" onclick="addStoryEntry('treatment')">＋ Add Entry</button>
+              <div class="story-log" id="slog-treatment"></div>
             </div>
-            <div class="notes-q-item">
-              <label class="notes-q-label">Anything specific you want Aylene to know or prioritize?</label>
-              <textarea class="notes-q-ta" id="nq-priority" placeholder="e.g. C&P exam scheduled in 6 weeks. Need to know what to say and what to avoid..."></textarea>
+
+            <div class="story-question">
+              <div class="story-q-label">⚡ Priority / Anything Else for Aylene</div>
+              <div class="story-q-prompt">Anything specific you want Aylene to know or focus on?</div>
+              <textarea class="notes-compose-ta" id="sq-priority" placeholder="e.g. C&amp;P exam in 6 weeks — need prep. Denied last year for sleep apnea. VSO appointment Thursday..." rows="2"></textarea>
+              <button class="btn-note-add" onclick="addStoryEntry('priority')">＋ Add Entry</button>
+              <div class="story-log" id="slog-priority"></div>
             </div>
           </div>
+
         </div>
-        <div id="notesSaveMsg" class="notes-save-msg" style="display:none">✅ Notes saved</div>
       </div>
 
       <!-- PROFILE & SETTINGS -->
@@ -801,6 +825,9 @@
       </div>
 
     </main>
+  </div>
+  <div class="app-disclaimer">
+    <strong>⚠️ Important Disclaimer:</strong> Mission: Connected is an independent educational tool built by veterans, for veterans. We are not affiliated with, endorsed by, or acting on behalf of the U.S. Department of Veterans Affairs. Nothing on this platform constitutes legal advice, medical advice, or a formal claim filing. All AI-generated content is for informational and educational purposes only — to help you understand your options and navigate the VA system more confidently. For formal claim representation, consult an accredited VA attorney or Veterans Service Organization (VSO). Your records, notes, and personal data are never shared with any third party, advertiser, or government agency.
   </div>
 </div>
 
@@ -915,6 +942,71 @@
     <div class="m-foot" id="contactModalFoot">
       <button class="btn btn-outline" onclick="closeModal('contactModal')">Cancel</button>
       <button class="btn btn-primary" id="contactSubmitBtn" onclick="submitContactForm()" style="display:none">Send →</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CONDITION MODAL -->
+<div class="m-overlay" id="editModal">
+  <div class="modal">
+    <div class="m-hdr"><div class="m-title">Edit Condition</div><button class="btn-close" onclick="closeModal('editModal')">✕</button></div>
+    <div class="m-body">
+      <input type="hidden" id="editCondId">
+      <div class="f-group"><label class="f-label">Condition Name</label><input class="f-input" id="editCondName" placeholder="e.g., Tinnitus, PTSD, Lumbar strain..."></div>
+      <div class="f-row">
+        <div class="f-group"><label class="f-label">Claim Basis</label>
+          <select class="f-select" id="editCondBasis" onchange="toggleEditSecondaryField(this.value)">
+            <option value="direct">Direct Service</option>
+            <option value="secondary">Secondary to another condition</option>
+            <option value="presumptive">Presumptive (PACT Act / exposure)</option>
+            <option value="lay">Lay Evidence Only</option>
+          </select>
+        </div>
+        <div class="f-group"><label class="f-label">Status</label>
+          <select class="f-select" id="editCondStatus">
+            <option value="todo">To Do</option>
+            <option value="inprog">In Progress</option>
+            <option value="filed">Filed</option>
+            <option value="won">Won</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-group" id="editSecondaryToField" style="display:none">
+        <label class="f-label">Secondary To</label>
+        <input class="f-input" id="editCondSecondaryTo" placeholder="e.g., PTSD, Lumbar strain, TBI...">
+      </div>
+      <div class="f-row">
+        <div class="f-group">
+          <label class="f-label">Current VA Rating</label>
+          <select class="f-select" id="editCondRating">
+            <option value="0">Not rated / 0%</option>
+            <option value="10">10%</option><option value="20">20%</option>
+            <option value="30">30%</option><option value="40">40%</option>
+            <option value="50">50%</option><option value="60">60%</option>
+            <option value="70">70%</option><option value="80">80%</option>
+            <option value="90">90%</option><option value="100">100%</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-label">Target Rating</label>
+          <select class="f-select" id="editCondTargetRating">
+            <option value="0">Unknown / TBD</option>
+            <option value="10">10%</option><option value="20">20%</option>
+            <option value="30">30%</option><option value="40">40%</option>
+            <option value="50">50%</option><option value="60">60%</option>
+            <option value="70">70%</option><option value="80">80%</option>
+            <option value="90">90%</option><option value="100">100%</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-group"><label class="f-label">Notes</label><textarea class="f-textarea" id="editCondNotes" placeholder="Any relevant notes, nexus details, or evidence..."></textarea></div>
+    </div>
+    <div class="m-foot" style="justify-content:space-between">
+      <button class="btn btn-outline" style="color:var(--red);border-color:var(--red)" onclick="deleteConditionFromEdit()">🗑️ Delete</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditCondition()">Save Changes</button>
+      </div>
     </div>
   </div>
 </div>
