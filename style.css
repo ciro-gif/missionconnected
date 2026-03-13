@@ -245,7 +245,6 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .a-tb-sponsor{font-size:11px;color:rgba(255,255,255,.5);padding-right:12px;border-right:1px solid rgba(255,255,255,.15);}
 .a-tb-sponsor strong{color:var(--gold);}
 .a-tb-ai{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7);}
-.a-tb-ai span{width:7px;height:7px;background:#22c55e;border-radius:50%;display:inline-block;animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .a-tb-user{display:flex;align-items:center;gap:8px;}
 .a-tb-user-email{font-size:11px;color:rgba(255,255,255,.65);}
@@ -824,3 +823,29 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 /* ── EDIT CONDITION MODAL ── */
 .f-textarea{width:100%;min-height:80px;resize:vertical;font-family:var(--font-body);font-size:13px;color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;box-sizing:border-box;line-height:1.6;}
 .f-textarea:focus{outline:none;border-color:var(--sky);}
+
+/* ── NETWORK STATUS (TOPBAR) — FIXED ── */
+.a-tb-net{display:flex;align-items:center;gap:5px;cursor:pointer;padding:4px 8px;border-radius:20px;background:rgba(255,255,255,.08);transition:.2s;white-space:nowrap;}
+.a-tb-net:hover{background:rgba(255,255,255,.15);}
+.net-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9CA3AF;flex-shrink:0;transition:background .4s;}
+.net-label{font-size:11px;color:rgba(255,255,255,.75);font-family:var(--font-body);line-height:1;}
+
+/* ── ROADMAP VS DASHBOARD NOTE ── */
+.roadmap-dash-note{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:var(--r);padding:12px 16px;font-size:12px;color:#3730A3;line-height:1.7;margin-bottom:16px;}
+.roadmap-dash-note strong{color:#1E1B4B;}
+
+/* ── VA RATING PICKER MODAL ── */
+.modal-rating{max-width:580px;}
+.rp-instruction{font-size:12px;color:var(--text-sec);background:var(--off-white);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;line-height:1.6;}
+.rp-options{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.rp-option{display:flex;align-items:flex-start;gap:14px;padding:11px 14px;border:2px solid var(--border);border-radius:var(--r);cursor:pointer;transition:all .15s;}
+.rp-option:hover{border-color:var(--sky);background:#F0F9FF;}
+.rp-option.selected{border-color:var(--navy);background:#EFF6FF;}
+.rp-opt-pct{font-size:18px;font-weight:800;color:var(--navy);font-family:var(--font-display);min-width:44px;flex-shrink:0;line-height:1.2;}
+.rp-opt-desc{font-size:12px;color:var(--text);line-height:1.6;}
+.rp-custom-row{border-top:1px solid var(--border);padding-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.rp-custom-label{font-size:12px;color:var(--text-sec);}
+.rp-custom-input-row{display:flex;align-items:center;gap:6px;}
+.rp-custom-input{width:72px;border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-size:16px;font-weight:700;color:var(--navy);text-align:center;font-family:var(--font-display);}
+.rp-custom-input:focus{outline:none;border-color:var(--sky);}
+.rp-custom-pct{font-size:16px;font-weight:700;color:var(--text-sec);}
