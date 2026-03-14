@@ -620,7 +620,27 @@ async function handleAuthSubmit() {
       result = await sbClient.auth.signUp({ email, password, options: { data: { full_name: fullName, phone, state, birth_month: birthMonth, birth_year: birthYear } } });
       if (result.error) throw result.error;
       if (result.data?.user) {
-        await sbClient.from('profiles').upsert({ id: result.data.user.id, screener_data: ans, full_name: fullName, phone, state, birth_month: birthMonth, birth_year: birthYear });
+        // Explicitly set the session so RLS recognizes auth.uid() before we upsert
+        if (result.data?.session) {
+          await sbClient.auth.setSession({
+            access_token: result.data.session.access_token,
+            refresh_token: result.data.session.refresh_token
+          });
+        }
+        // Retry upsert up to 3x to handle session propagation delay
+        let upsertOk = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { error: upsertErr } = await sbClient.from('profiles').upsert({
+            id: result.data.user.id,
+            screener_data: ans,
+            full_name: fullName, phone, state,
+            birth_month: birthMonth, birth_year: birthYear
+          }, { onConflict: 'id' });
+          if (!upsertErr) { upsertOk = true; break; }
+          console.warn(`Profile upsert attempt ${attempt+1} failed:`, upsertErr.message);
+          await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+        }
+        if (!upsertOk) console.warn('Profile upsert failed after 3 attempts — trigger will handle it on next login');
         setUser(result.data.user);
         closeAuth();
         logActivity('account_created', '🎉 Account created — welcome to Mission: Connected');
@@ -652,10 +672,11 @@ async function signOut() {
 async function saveRoadmapToSupabase() {
   if (!sbClient || !currentUser || !roadmapData) return;
   try {
-    await sbClient.from('profiles').upsert({
+    const { error: re } = await sbClient.from('profiles').upsert({
       id: currentUser.id, screener_data: ans, roadmap_text: roadmapData
-    });
-  } catch(e) { console.warn('Save error:', e); }
+    }, { onConflict: 'id' });
+    if (re) console.warn('saveRoadmap upsert error:', re.message, re.code);
+  } catch(e) { console.warn('saveRoadmap exception:', e); }
 }
 
 // ── CALC ──
@@ -1598,13 +1619,15 @@ async function saveConditions() {
         notes: c.notes || null
       };
       if (c.id?.startsWith('local-')) {
-        const { data } = await sbClient.from('claims').insert(payload).select().single();
-        if (data) c.id = data.id;
+        const { data, error: ie } = await sbClient.from('claims').insert(payload).select().single();
+        if (ie) console.warn('claims insert error:', ie.message, ie.code);
+        else if (data) c.id = data.id;
       } else {
-        await sbClient.from('claims').update(payload).eq('id', c.id);
+        const { error: ue } = await sbClient.from('claims').update(payload).eq('id', c.id);
+        if (ue) console.warn('claims update error:', ue.message, ue.code);
       }
     }
-  } catch(e) { console.warn('Save conditions error:', e); }
+  } catch(e) { console.warn('saveConditions exception:', e); }
 }
 
 function openAddModal() {
