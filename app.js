@@ -387,10 +387,14 @@ async function loadUserData() {
     const { data: profile } = await sbClient.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile?.screener_data) Object.assign(ans, profile.screener_data);
     if (profile?.roadmap_text) { roadmapData = profile.roadmap_text; }
+    if (profile?.notes) { notesData = profile.notes; renderNoteLog(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }
     const { data: claims } = await sbClient.from('claims').select('*').eq('user_id', currentUser.id);
-    if (claims?.length) { conditions = claims; }
-    if (roadmapData) renderRoadmap(roadmapData);
-    if (conditions.length) renderDashboard();
+    if (claims?.length) { conditions = claims.map(c => ({ ...c, secondaryTo: c.secondary_to, targetRating: c.target_rating })); }
+    if (roadmapData || conditions.length) {
+      showView('vApp');
+      if (roadmapData) { renderRoadmap(roadmapData); showPage('roadmap'); }
+      if (conditions.length) renderDashboard();
+    }
   } catch(e) { console.warn('Load error:', e); }
 }
 
