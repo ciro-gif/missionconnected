@@ -386,7 +386,7 @@ async function loadUserData() {
   try {
     const { data: profile } = await sbClient.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile?.screener_data) Object.assign(ans, profile.screener_data);
-    if (profile?.roadmap_text) { roadmapData = profile.roadmap_text; }
+    if (profile?.roadmap_text) { try { roadmapData = typeof profile.roadmap_text === 'string' ? JSON.parse(profile.roadmap_text) : profile.roadmap_text; } catch(e) { roadmapData = profile.roadmap_text; } }
     if (profile?.notes) { notesData = profile.notes; renderNoteLog(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }
     const { data: claims } = await sbClient.from('claims').select('*').eq('user_id', currentUser.id);
     if (claims?.length) { conditions = claims.map(c => ({ ...c, secondaryTo: c.secondary_to, targetRating: c.target_rating })); }
