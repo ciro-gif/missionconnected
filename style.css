@@ -1254,3 +1254,49 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   line-height: 1.5;
   font-weight: 500;
 }
+
+/* ── TERA PATHWAY BANNER ── */
+.tera-pathway-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  background: linear-gradient(135deg, #002855 0%, #0050A0 100%);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--gold);
+}
+.tera-banner-left { flex: 1; }
+.tera-banner-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.tera-banner-body {
+  font-size: 13px;
+  color: rgba(255,255,255,.88);
+  line-height: 1.6;
+}
+.tera-banner-body strong { color: #fff; }
+.tera-banner-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.tera-stat-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.tera-stat-label {
+  font-size: 10px;
+  color: rgba(255,255,255,.6);
+  white-space: nowrap;
+}
