@@ -983,21 +983,64 @@ async function buildRoadmap() {
   }, 1800);
 
   const mosLabel = ans.mos?.label || ans.mos?.title || '';
-  const teraFlag = ans.mos?.tera ? ' [TERA]' : '';
-  const prompt = `VA claims expert. Veteran profile below. Return ONLY minified JSON, no markdown.
 
-${ans.branch?.join('/')} ${ans.component}, MOS ${ans.mos?.code||'?'} ${mosLabel}${teraFlag}, ${ans.startYear}-${ans.endYear}, ${ans.discharge}
-Deployments:${ans.deployments?.join(',')||'None'} Exposures:${ans.exposures?.join(',')||'None'}
-VA:${ans.vaStatus} Rated:${ans.ratedConds?.join(',')||'None'}
-Symptoms:${ans.symptoms?.join(',')||'None'}
-Diagnoses:${ans.diagnoses?.join(',')||'None'}
-Events:${ans.events?.join(',')||'None'}
+  // ── PATHWAY CLASSIFIER ──
+  // Determines veteran's legal position before prompt generation.
+  // TERA only applies when MOS flag + actual qualifying exposure exist together.
+  const hasTera = ans.mos?.tera && (
+    ans.exposures?.some(e => /chemical|solvent|cbrn|burn.?pit|agent.?orange|radiation|contaminated|asbestos|lead|depleted/i.test(e)) ||
+    ans.deployments?.some(d => /gulf|vietnam|korea|oif|oef|swa|southwest.?asia/i.test(d))
+  );
+  const hasPriorRating = ans.ratedConds?.length > 0;
+  const hasCombatService = ans.events?.some(e => /combat|deployment|hostile|idf|mortar|ied|firefight|direct.?fire/i.test(e));
 
-Return this JSON with 2-4 conditions only:
-{"summary":"1-2 sentences","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","targetRating":N,"nexus":"1 sentence","evidence_have":"brief","evidence_need":"brief","action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"1 sentence"}
+  const pathwayLines = [];
+  if (hasTera) pathwayLines.push(
+    'PATHWAY: TERA/PACT ACT — Veteran has qualifying MOS (' + (ans.mos?.code||'') + ') AND documented exposure (' + (ans.exposures?.join(', ')||'') + '). ' +
+    'Under 38 CFR 3.309(e) and the PACT Act, VA has a legal duty to obtain a C&P medical opinion if one does not exist — ' +
+    'veteran does NOT need a private nexus letter. However, obtaining one is an OPTION that can strengthen the rating or push to a higher tier. ' +
+    'Mark covered conditions as type:presumptive. File simultaneously — no need to sequence presumptive claims.'
+  );
+  if (hasPriorRating) pathwayLines.push(
+    'PATHWAY: SECONDARY SERVICE CONNECTION — Veteran has prior ratings (' + (ans.ratedConds?.join(', ')||'') + '). ' +
+    'Conditions caused or aggravated by rated conditions = type:secondary. ' +
+    'Assign filing_order AFTER primary condition. Secondary claims are strongest after primary is rated.'
+  );
+  if (hasCombatService) pathwayLines.push(
+    'PATHWAY: COMBAT/PTSD LIBERAL STANDARD — Under 38 CFR 3.304(f), personal statement + buddy letters carry significant weight. ' +
+    'No requirement to corroborate in-service stressor with service records for PTSD.'
+  );
+  if (!hasTera && !hasPriorRating) pathwayLines.push(
+    'PATHWAY: DIRECT SERVICE CONNECTION — Must establish 3-legged stool: current diagnosis + in-service event + medical nexus. ' +
+    'Private nexus letter from treating physician strongly recommended. Mark as type:direct.'
+  );
+  const pathwayContext = pathwayLines.join('\n');
 
-targetRating = realistic VA rating based on reported symptoms (not minimum — use actual diagnostic criteria: e.g. CPAP for sleep apnea=50, daily bronchodilator=30 for asthma, tinnitus always=10).
-Be specific to MOS. Winnable claims only. MINIFIED JSON ONLY.`;
+  const prompt = `You are a VA claims strategist generating a personalized legal roadmap. Return ONLY minified JSON, no markdown.
+
+VETERAN PROFILE:
+${ans.branch?.join('/')} ${ans.component} | MOS ${ans.mos?.code||'?'} ${mosLabel} | ${ans.startYear}-${ans.endYear} | ${ans.discharge} discharge
+Deployments: ${ans.deployments?.join(', ')||'None'}
+Exposures: ${ans.exposures?.join(', ')||'None'}
+VA Status: ${ans.vaStatus} | Prior Ratings: ${ans.ratedConds?.join(', ')||'None'}
+Symptoms: ${ans.symptoms?.join(', ')||'None'}
+Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
+In-Service Events: ${ans.events?.join(', ')||'None'}
+
+LEGAL PATHWAY (apply strictly to every condition):
+${pathwayContext}
+
+RULES:
+- 2-4 winnable conditions only, specific to this MOS and exposure history
+- filing_order: integer 1-4 indicating sequence to file. Simultaneous = same number. Secondary must be higher than anchor.
+- options: 2-3 real strategic choices veteran has (not instructions — actual decision points they face)
+- For TERA/presumptive: options MUST include both "File now — VA required to schedule C&P at no cost" AND "Optionally obtain private nexus letter to target higher rating tier"
+- strategy: why this filing approach makes sense for this specific veteran's legal position
+- targetRating: CPAP required=50, daily bronchodilator=30, tinnitus=10, mild-moderate anxiety/PTSD=30-50, severe=70
+
+RETURN THIS JSON STRUCTURE (minified):
+{"summary":"2-3 sentences on legal position and overall strategy","pathway":"TERA_PACT|DIRECT|SECONDARY|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for TERA: note VA duty to obtain C&P opinion; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
+MINIFIED JSON ONLY.`;
 
   try {
     const data = await callClaude([{role:'user',content:prompt}], 1200);
@@ -1019,8 +1062,10 @@ Be specific to MOS. Winnable claims only. MINIFIED JSON ONLY.`;
     conditions = roadmapData.conditions?.map((c, i) => ({
       id: 'local-'+i, name: c.name, rating: 0, col: 'todo',
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
-      nexus: c.nexus, evidence_need: c.evidence_need, action: c.action,
+      nexus: c.nexus, evidence_have: c.evidence_have, evidence_need: c.evidence_need,
+      action: c.action, options: c.options||[],
       secondaryTo: c.secondaryTo||'', cfr: c.cfr||'',
+      filing_order: c.filing_order || (i+1),
       targetRating: c.targetRating || 0,
       ratingCriteria: c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name)
     })) || [];
@@ -1106,6 +1151,11 @@ function renderRoadmap(data) {
     return `<div class="rm-section-hdr">${label}</div>` + conds.map(c => renderCondCard(c, typeColors, typeLabels)).join('');
   };
 
+  // Filing sequence banner
+  if (data.filing_sequence) {
+    html += `<div class="alert alert-blue" style="margin-bottom:12px"><span>📋</span><span><strong>Filing Strategy:</strong> ${data.filing_sequence}</span></div>`;
+  }
+
   html += renderGroup(high, '🔴 High Priority');
   html += renderGroup(mid, '🟡 Medium Priority');
   html += renderGroup(low, '🔵 Lower Priority');
@@ -1140,6 +1190,7 @@ function renderCondCard(c, typeColors, typeLabels) {
         <div class="cond-name">${c.name}</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px">
           <span class="cond-pri-badge badge-${c.type}">${label}</span>
+          ${c.filing_order ? `<span style="font-size:10px;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 6px;font-weight:600">File #${c.filing_order}</span>` : ''}
           ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec)">↳ Secondary to ${c.secondaryTo}</span>` : ''}
           ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint)">${c.cfr}</span>` : ''}
           ${dc ? `<span class="cond-dc-badge">DC ${dc.code}</span>` : ''}
@@ -1154,6 +1205,11 @@ function renderCondCard(c, typeColors, typeLabels) {
         ${c.evidence_need ? `<div class="ele-row ele-row-red"><div class="ele-label r">NEED</div><div class="ele-val">${c.evidence_need}</div></div>` : ''}
         ${c.action ? `<div class="ele-row ele-row-blue"><div class="ele-label b">ACTION</div><div class="ele-val">${c.action}</div></div>` : ''}
       </div>
+      ${c.options?.length ? `
+      <div class="cond-options-box">
+        <div class="cond-options-hdr">⚖️ Your Options</div>
+        ${c.options.map((opt, i) => `<div class="cond-option-row"><span class="cond-option-num">${i+1}</span><span>${opt}</span></div>`).join('')}
+      </div>` : ''}
       ${c.ratingCriteria?.length ? `
       <div class="rating-criteria">
         <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `Diagnostic Code ${dc.code}` : '38 CFR Part 4'}</div>
