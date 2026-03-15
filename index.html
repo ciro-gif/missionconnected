@@ -616,6 +616,10 @@
       <div class="nav-item" id="nav-regulations" onclick="showPage('regulations')"><span class="nav-icon">📖</span> VA Regulations</div>
       <div class="nav-item" id="nav-activity" onclick="showPage('activity')"><span class="nav-icon">📋</span> Activity Log <span class="nav-badge" id="activityBadge">0</span></div>
       <div class="nav-item" id="nav-notes" onclick="showPage('notes')"><span class="nav-icon">📝</span> My Notes</div>
+      <div class="nav-item" id="nav-cpprep" onclick="showPage('cpprep')"><span class="nav-icon">🎯</span> C&amp;P Exam Prep</div>
+      <div class="nav-item" id="nav-deadlines" onclick="showPage('deadlines')"><span class="nav-icon">📅</span> Deadlines <span class="nav-badge nav-badge-red" id="deadlineBadge" style="display:none">!</span></div>
+      <div class="nav-item" id="nav-buddy" onclick="showPage('buddy')"><span class="nav-icon">✍️</span> Buddy Statement</div>
+      <div class="nav-item" id="nav-timeline" onclick="showPage('timeline')"><span class="nav-icon">📬</span> After You File</div>
 
       <!-- ACCOUNT -->
       <div class="nav-section-label" id="navAccountSection" style="display:none">Account</div>
@@ -827,10 +831,119 @@
         </div>
       </div>
 
+      <!-- C&P EXAM PREP -->
+      <div class="page" id="page-cpprep">
+        <div class="pg-hdr">
+          <div><div class="pg-title">C&amp;P Exam Prep</div><div class="pg-sub">Condition-by-condition — know exactly what the examiner is looking for</div></div>
+          <button class="btn btn-gold" onclick="showPage('chat')">💬 Ask Aylene</button>
+        </div>
+        <div class="alert alert-blue" style="margin-bottom:20px">
+          <span>⚡</span><span>The C&amp;P exam is the single most important moment in your claim. Veterans lose ratings by minimizing symptoms or having a good day. This prep guide is built from your specific conditions — describe your <strong>worst days</strong>, not your average days.</span>
+        </div>
+        <div id="cpprepContent"><div class="empty-state"><div style="font-size:36px;margin-bottom:10px">🎯</div>Complete your screener to generate your personalized C&P prep guide.</div></div>
+      </div>
+
+      <!-- DEADLINES -->
+      <div class="page" id="page-deadlines">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Deadlines &amp; Key Dates</div><div class="pg-sub">Missing a deadline can cost you thousands in retroactive pay</div></div>
+          <button class="btn btn-primary" onclick="addDeadlineModal()">＋ Add Date</button>
+        </div>
+        <div class="alert alert-amber" style="margin-bottom:20px">
+          <span>⚠️</span><span><strong>Intent to File</strong> locks your effective date — the date VA starts calculating your back pay. File it immediately, even before you have all your evidence. It costs nothing and protects your money.</span>
+        </div>
+        <div id="deadlinesContent"></div>
+      </div>
+
+      <!-- BUDDY STATEMENT GENERATOR -->
+      <div class="page" id="page-buddy">
+        <div class="pg-hdr">
+          <div><div class="pg-title">Buddy Statement Generator</div><div class="pg-sub">Lay evidence from people who witnessed your service or symptoms</div></div>
+        </div>
+        <div class="alert alert-blue" style="margin-bottom:20px">
+          <span>📋</span><span>A buddy statement (VA Form 21-10210) is a written statement from someone who witnessed your in-service incident, your symptoms, or how your condition affects your daily life. They carry real weight — especially for PTSD, MST, and conditions without clear medical records.</span>
+        </div>
+        <div class="buddy-layout">
+          <div class="buddy-form-card">
+            <div class="buddy-form-hdr">Statement Details</div>
+            <div class="f-group"><label class="f-label">Who is writing this statement?</label>
+              <select class="f-select" id="buddyRelation" onchange="updateBuddyPlaceholders()">
+                <option value="fellow_veteran">Fellow Veteran / Battle Buddy</option>
+                <option value="spouse">Spouse / Partner</option>
+                <option value="family">Family Member</option>
+                <option value="supervisor">Military Supervisor / Chain of Command</option>
+                <option value="friend">Civilian Friend or Coworker</option>
+              </select>
+            </div>
+            <div class="f-group"><label class="f-label">Statement author's full name</label>
+              <input class="f-input" id="buddyAuthorName" placeholder="e.g. James R. Thompson">
+            </div>
+            <div class="f-group"><label class="f-label">Their relationship to you</label>
+              <input class="f-input" id="buddyRelationDetail" placeholder="e.g. Served together in 3rd Battalion, 74th CBRN, 2015-2018">
+            </div>
+            <div class="f-group"><label class="f-label">What condition or incident does this statement address?</label>
+              <input class="f-input" id="buddyCondition" placeholder="e.g. Asthma / chemical exposure during CBRN training">
+            </div>
+            <div class="f-group"><label class="f-label">What did they personally witness? <span style="color:var(--text-hint);font-weight:400">(be specific)</span></label>
+              <textarea class="f-textarea" id="buddyWitnessed" rows="3" placeholder="e.g. I witnessed [veteran] respond to live chemical agent training drills without full protective gear on at least 6 occasions between 2016 and 2018 at Fort Leonard Wood..."></textarea>
+            </div>
+            <div class="f-group"><label class="f-label">How have they seen this affect your daily life?</label>
+              <textarea class="f-textarea" id="buddyImpact" rows="3" placeholder="e.g. I have personally observed [veteran] use an inhaler multiple times per week, cancel plans due to breathing difficulties, and be unable to participate in physical activities we used to do together..."></textarea>
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="generateBuddyStatement()">✨ Generate Statement</button>
+          </div>
+          <div class="buddy-output-card" id="buddyOutputCard">
+            <div class="buddy-output-hdr">Generated Statement</div>
+            <div class="buddy-output-sub">Review carefully, edit as needed, then print or share with the statement author to sign and submit with VA Form 21-10210.</div>
+            <div class="buddy-output-body" id="buddyOutput"><div class="empty-state" style="padding:40px 0">Fill in the form and click Generate to create a formatted buddy statement.</div></div>
+            <div class="buddy-output-actions" id="buddyOutputActions" style="display:none">
+              <button class="btn btn-outline" onclick="copyBuddyStatement()">📋 Copy Text</button>
+              <button class="btn btn-primary" onclick="printBuddyStatement()">🖨️ Print</button>
+              <button class="btn btn-gold" onclick="showPage('chat')">💬 Ask Aylene to Strengthen It</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFTER YOU FILE — POST-FILING TIMELINE -->
+      <div class="page" id="page-timeline">
+        <div class="pg-hdr">
+          <div><div class="pg-title">After You File</div><div class="pg-sub">What to expect from submission to rating decision</div></div>
+        </div>
+        <div id="timelineContent"></div>
+      </div>
+
     </main>
   </div>
   <div class="app-disclaimer">
     <strong>⚠️ Important Disclaimer:</strong> Mission: Connected is an independent educational tool built by veterans, for veterans. We are not affiliated with, endorsed by, or acting on behalf of the U.S. Department of Veterans Affairs. Nothing on this platform constitutes legal advice, medical advice, or a formal claim filing. All AI-generated content is for informational and educational purposes only — to help you understand your options and navigate the VA system more confidently. For formal claim representation, consult an accredited VA attorney or Veterans Service Organization (VSO). Your records, notes, and personal data are never shared with any third party, advertiser, or government agency.
+  </div>
+</div>
+
+<!-- ADD DEADLINE MODAL -->
+<div class="m-overlay" id="deadlineModal">
+  <div class="modal" style="max-width:480px">
+    <div class="m-hdr"><div class="m-title">Add Key Date</div><button class="btn-close" onclick="closeModal('deadlineModal')">✕</button></div>
+    <div class="m-body">
+      <div class="f-group"><label class="f-label">Date Label</label><input class="f-input" id="dlLabel" placeholder="e.g. Intent to File submitted, C&P Exam, Appeal Deadline..."></div>
+      <div class="f-group"><label class="f-label">Date</label><input class="f-input" type="date" id="dlDate"></div>
+      <div class="f-group"><label class="f-label">Type</label>
+        <select class="f-select" id="dlType">
+          <option value="intent">Intent to File</option>
+          <option value="exam">C&P Exam</option>
+          <option value="deadline">Appeal Deadline</option>
+          <option value="followup">Follow-Up</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="f-group"><label class="f-label">Notes <span style="color:var(--text-hint);font-weight:400">(optional)</span></label>
+        <input class="f-input" id="dlNotes" placeholder="Any additional context...">
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-outline" onclick="closeModal('deadlineModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDeadline()">Save Date</button>
+    </div>
   </div>
 </div>
 
