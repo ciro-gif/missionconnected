@@ -1206,13 +1206,13 @@ function renderCondCard(c, typeColors, typeLabels) {
         ${c.nexus ? `<div class="ele-row ele-row-blue"><div class="ele-label b">NEXUS</div><div class="ele-val">${c.nexus}</div></div>` : ''}
         ${c.evidence_have ? `<div class="ele-row ele-row-green"><div class="ele-label g">HAVE</div><div class="ele-val">${c.evidence_have}</div></div>` : ''}
         ${c.evidence_need ? `<div class="ele-row ele-row-red"><div class="ele-label r">NEED</div><div class="ele-val">${c.evidence_need}</div></div>` : ''}
-        ${c.action ? `<div class="ele-row ele-row-blue"><div class="ele-label b">ACTION</div><div class="ele-val">${c.action}</div></div>` : ''}
       </div>
       ${c.options?.length ? `
       <div class="cond-options-box">
-        <div class="cond-options-hdr">⚖️ Your Options</div>
+        <div class="cond-options-hdr">⚖️ Your Options — Choose Your Path</div>
         ${c.options.map((opt, i) => `<div class="cond-option-row"><span class="cond-option-num">${i+1}</span><span>${opt}</span></div>`).join('')}
       </div>` : ''}
+      ${c.action ? `<div class="cond-next-step"><div class="cond-next-step-label">Your Next Step</div><div class="cond-next-step-text">${c.action}</div></div>` : ''}
       ${c.ratingCriteria?.length ? `
       <div class="rating-criteria">
         <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `Diagnostic Code ${dc.code}` : '38 CFR Part 4'}</div>
@@ -1549,45 +1549,86 @@ function toggleCheck(condId, checkIdx) {
 function printRoadmap() {
   if (!roadmapData || !conditions.length) { alert('Complete your screener first to generate a roadmap to print.'); return; }
   const branch = ans.branch?.[0] || 'Veteran';
-  const mos = ans.mos?.code ? `${ans.mos.code} — ${ans.mos.title||''}` : '';
-  const typeLabels = { direct:'Direct Service', secondary:'Secondary', presumptive:'Presumptive', lay:'Lay Evidence' };
-  const condHTML = conditions.map(c => `
-    <div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:12px;break-inside:avoid">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
-        <strong style="font-size:15px">${c.name}</strong>
-        <span style="font-size:11px;background:#002855;color:white;padding:2px 7px;border-radius:3px">${typeLabels[c.type]||c.type}</span>
+  const mos = ans.mos?.code ? `${ans.mos.code} — ${ans.mos.title||ans.mos.label||''}` : '';
+  const typeLabels = { direct:'Direct Service', secondary:'Secondary', presumptive:'Presumptive / PACT Act', lay:'Lay Evidence' };
+  const pathwayLabels = { TERA_PACT:'TERA / PACT Act', DIRECT:'Direct Service Connection', SECONDARY:'Secondary Service Connection', MIXED:'Multiple Pathways' };
+
+  const condHTML = conditions.map((c, i) => `
+    <div style="border:1px solid #ccc;border-radius:6px;padding:16px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        ${c.filing_order ? `<span style="font-size:11px;background:#F1F5F9;color:#334155;padding:2px 8px;border-radius:3px;font-weight:700">File #${c.filing_order}</span>` : ''}
+        <strong style="font-size:16px;color:#002855">${c.name}</strong>
+        <span style="font-size:11px;background:#002855;color:white;padding:2px 8px;border-radius:3px">${typeLabels[c.type]||c.type}</span>
+        ${c.targetRating ? `<span style="font-size:11px;background:#C9A84C;color:#002855;padding:2px 8px;border-radius:3px;font-weight:700">Target: ${c.targetRating}%</span>` : ''}
         ${c.secondaryTo ? `<span style="font-size:11px;color:#666">↳ Secondary to ${c.secondaryTo}</span>` : ''}
         ${c.cfr ? `<span style="font-size:10px;color:#999">${c.cfr}</span>` : ''}
       </div>
-      ${c.nexus ? `<div style="margin-bottom:6px"><strong style="color:#0050A0;font-size:11px">NEXUS:</strong> ${c.nexus}</div>` : ''}
-      ${c.evidence_have ? `<div style="margin-bottom:6px"><strong style="color:#16A34A;font-size:11px">HAVE:</strong> ${c.evidence_have}</div>` : ''}
-      ${c.evidence_need ? `<div style="margin-bottom:6px"><strong style="color:#DC2626;font-size:11px">NEED:</strong> ${c.evidence_need}</div>` : ''}
-      ${c.action ? `<div style="margin-bottom:6px"><strong style="color:#0050A0;font-size:11px">ACTION:</strong> ${c.action}</div>` : ''}
-      ${c.ratingCriteria?.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee">
-        <div style="font-size:11px;font-weight:700;color:#002855;margin-bottom:6px">VA RATING CRITERIA (38 CFR Part 4)</div>
-        ${c.ratingCriteria.map(r => `<div style="display:flex;gap:8px;margin-bottom:4px;font-size:12px"><span style="min-width:32px;font-weight:700;color:#002855">${r.pct}%</span><span>${r.desc}</span></div>`).join('')}
+      ${c.nexus ? `<div style="margin-bottom:8px;padding:6px 8px;background:#EFF6FF;border-left:3px solid #0050A0;border-radius:3px"><span style="font-weight:700;color:#0050A0;font-size:11px;text-transform:uppercase">Nexus / Legal Basis: </span><span style="font-size:12px">${c.nexus}</span></div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        ${c.evidence_have ? `<div style="padding:6px 8px;background:#F0FDF4;border-left:3px solid #16A34A;border-radius:3px"><div style="font-weight:700;color:#16A34A;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence You Have</div><div style="font-size:12px">${c.evidence_have}</div></div>` : ''}
+        ${c.evidence_need ? `<div style="padding:6px 8px;background:#FFF5F5;border-left:3px solid #DC2626;border-radius:3px"><div style="font-weight:700;color:#DC2626;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence Still Needed</div><div style="font-size:12px">${c.evidence_need}</div></div>` : ''}
+      </div>
+      ${c.options?.length ? `
+      <div style="margin-bottom:10px;padding:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px">
+        <div style="font-weight:700;color:#92400E;font-size:11px;text-transform:uppercase;margin-bottom:6px">Your Options — Choose Your Path</div>
+        ${c.options.map((opt, oi) => `<div style="display:flex;gap:8px;margin-bottom:4px;font-size:12px"><span style="min-width:18px;height:18px;background:#92400E;color:white;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${oi+1}</span><span>${opt}</span></div>`).join('')}
+      </div>` : ''}
+      ${c.action ? `<div style="padding:8px 10px;background:#002855;color:white;border-radius:4px;font-size:12px"><span style="font-weight:700;font-size:10px;text-transform:uppercase;opacity:.8">Your Next Step: </span>${c.action}</div>` : ''}
+      ${c.ratingCriteria?.length ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee">
+        <div style="font-size:10px;font-weight:700;color:#002855;text-transform:uppercase;margin-bottom:6px">VA Rating Criteria (38 CFR Part 4)</div>
+        ${c.ratingCriteria.map(r => `<div style="display:flex;gap:8px;margin-bottom:3px;font-size:11px"><span style="min-width:32px;font-weight:700;color:#002855">${r.pct}%</span><span style="color:#444">${r.desc}</span></div>`).join('')}
       </div>` : ''}
     </div>`).join('');
 
-  const win = window.open('', '_blank', 'width=800,height=900');
+  const win = window.open('', '_blank', 'width=820,height=1000');
   win.document.write(`<!DOCTYPE html><html><head><title>VA Disability Roadmap — Mission: Connected</title>
-    <style>body{font-family:Arial,sans-serif;max-width:740px;margin:30px auto;color:#1a1a2e;font-size:13px;line-height:1.5}
-    h1{color:#002855;font-size:22px;margin-bottom:4px}
-    h2{color:#002855;font-size:13px;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;border-bottom:2px solid #002855;padding-bottom:4px}
-    .meta{color:#666;font-size:12px;margin-bottom:20px}
-    .disclaimer{font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:24px;padding-top:10px;line-height:1.5}
-    @media print{body{margin:15px}button{display:none}}</style></head><body>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+    <style>
+      body{font-family:Arial,sans-serif;max-width:740px;margin:30px auto;color:#1a1a2e;font-size:13px;line-height:1.5}
+      h1{color:#002855;font-size:22px;margin-bottom:4px}
+      h2{color:#002855;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:20px 0 8px;border-bottom:2px solid #002855;padding-bottom:4px}
+      .meta{color:#666;font-size:12px;margin-bottom:6px}
+      .strategy-box{background:#002855;color:white;border-radius:6px;padding:14px 16px;margin-bottom:20px}
+      .strategy-box .s-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#C9A84C;margin-bottom:4px}
+      .strategy-box .s-text{font-size:13px;line-height:1.6;color:rgba(255,255,255,.9)}
+      .seq-box{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:12px 14px;margin-bottom:20px}
+      .seq-box .seq-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#1E40AF;margin-bottom:4px}
+      .seq-box .seq-text{font-size:13px;color:#1E3A5F}
+      .top-action{background:#C9A84C;border-radius:6px;padding:12px 16px;margin-bottom:20px}
+      .top-action .ta-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#002855;margin-bottom:4px}
+      .top-action .ta-text{font-size:14px;font-weight:700;color:#002855}
+      .disclaimer{font-size:10px;color:#888;border-top:1px solid #ddd;margin-top:24px;padding-top:10px;line-height:1.5}
+      @media print{body{margin:15px}button{display:none}.no-print{display:none}}
+    </style></head><body>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <div style="background:#002855;color:white;font-size:14px;padding:6px 10px;border-radius:4px;font-weight:700">M·C</div>
       <h1>Mission: Connected — VA Disability Roadmap</h1>
     </div>
-    <div class="meta">${branch} Veteran · ${mos} · ${ans.startYear||'?'}–${ans.endYear||'Present'} · Generated ${new Date().toLocaleDateString()}</div>
-    <button onclick="window.print()" style="margin-bottom:16px;padding:8px 16px;background:#002855;color:white;border:none;border-radius:4px;cursor:pointer">🖨️ Print / Save as PDF</button>
+    <div class="meta">${branch} Veteran · ${mos} · ${ans.startYear||'?'}–${ans.endYear||'Present'}</div>
+    <div class="meta" style="margin-bottom:16px">Pathway: <strong>${pathwayLabels[roadmapData.pathway]||roadmapData.pathway||'Direct Service'}</strong> · Generated ${new Date().toLocaleDateString()}</div>
+    <button class="no-print" onclick="window.print()" style="margin-bottom:20px;padding:8px 16px;background:#002855;color:white;border:none;border-radius:4px;cursor:pointer;font-size:13px">🖨️ Print / Save as PDF</button>
+
+    ${roadmapData.top_action ? `<div class="top-action">
+      <div class="ta-label">⚡ Your Single Most Important Next Action</div>
+      <div class="ta-text">${roadmapData.top_action}</div>
+    </div>` : ''}
+
+    ${roadmapData.filing_sequence ? `<div class="seq-box">
+      <div class="seq-label">📋 Filing Sequence — Do This in This Order</div>
+      <div class="seq-text">${roadmapData.filing_sequence}</div>
+    </div>` : ''}
+
+    ${roadmapData.strategy ? `<div class="strategy-box">
+      <div class="s-label">Strategic Overview</div>
+      <div class="s-text">${roadmapData.strategy}</div>
+    </div>` : ''}
+
     <h2>Summary</h2>
-    <p>${roadmapData.summary || ''}</p>
-    <h2>${conditions.length} Conditions Identified</h2>
+    <p style="font-size:13px;line-height:1.6;color:#333">${roadmapData.summary || ''}</p>
+
+    <h2>${conditions.length} Condition${conditions.length!==1?'s':''} Identified</h2>
     ${condHTML}
-    <div class="disclaimer">⚠️ This roadmap is AI-generated for educational and informational purposes only. It does not constitute legal or medical advice. Mission: Connected is not affiliated with the U.S. Department of Veterans Affairs. Consult an accredited VSO or VA attorney for formal representation.</div>
+
+    <div class="disclaimer">⚠️ This roadmap is AI-generated for educational and informational purposes only. It does not constitute legal or medical advice. Mission: Connected is not affiliated with the U.S. Department of Veterans Affairs. Consult an accredited VSO or VA attorney for formal claim representation.</div>
   </body></html>`);
   win.document.close();
 }
