@@ -26,6 +26,7 @@ let activityLog = [];
 let undoStack = [];
 let notesData = { entries: [], story: { event:[], impact:[], treatment:[], priority:[] } };
 let networkOk = null;
+let deadlines = [];
 
 // ── NOTES ENTRY LOG SYSTEM ──
 function addNoteEntry() {
@@ -423,6 +424,10 @@ function showPage(id) {
   if (id === 'profile') renderProfile();
   if (id === 'records') { updateRecordsStorageBanner(); }
   if (id === 'notes') { loadNotes(); }
+  if (id === 'cpprep') { renderCPPrep(); }
+  if (id === 'deadlines') { renderDeadlines(); }
+  if (id === 'buddy') { updateBuddyPlaceholders(); }
+  if (id === 'timeline') { renderTimeline(); }
 }
 
 // ── ACTIVITY LOG ──
@@ -1073,10 +1078,8 @@ MINIFIED JSON ONLY.`;
     if (currentUser) await saveRoadmapToSupabase();
     logActivity('roadmap_generated', `🗺️ Roadmap generated — ${roadmapData.conditions?.length || 0} conditions identified`);
     showView('vApp');
-    showPage('roadmap');
-    renderRoadmap(roadmapData);
-    renderDashboard();
     updateSidebar();
+    showLandingMoment(roadmapData);
   } catch(e) {
     clearInterval(stepInterval);
     console.error('Roadmap error:', e);
@@ -2011,51 +2014,66 @@ function finishRename(id, newName) {
 async function analyzeFileWithAylene(id) {
   const f = uploadedFiles.find(f => f.id === id);
   if (!f) return;
-  // Navigate to chat first, wait for it to be ready
   if (currentPage !== 'chat') {
     showPage('chat');
-    await new Promise(r => setTimeout(r, 1200)); // let initChat settle
+    await new Promise(r => setTimeout(r, 1200));
   }
   if (chatHistory.length === 0) await new Promise(r => setTimeout(r, 800));
-  // Read file content
+
   const reader = new FileReader();
   reader.onload = async (e) => {
-    const content = e.target.result;
-    const isPDF = f.file.type.includes('pdf');
-    const isImage = f.file.type.includes('image');
+    const base64 = e.target.result.split(',')[1];
+    const mediaType = f.file.type || (f.displayName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+    const isPDF = mediaType.includes('pdf') || f.displayName.toLowerCase().endsWith('.pdf');
+    const isImage = mediaType.startsWith('image/');
+
     const userMsg = `Please analyze this document for me: "${f.displayName}"`;
     appendMsg('user', userMsg);
     chatHistory.push({ role: 'user', content: userMsg });
     showTyping();
-    await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
+    await new Promise(r => setTimeout(r, 1000));
+
+    const analysisPrompt = `This veteran uploaded a document called "${f.displayName}". Analyze it thoroughly in the context of their VA disability claim:
+
+1. What type of document is this?
+2. Key findings — what does this say that matters for their claim?
+3. If it's a decision letter: what was approved, denied, at what rating? Any rating errors or appealable points?
+4. If it's a medical record: what diagnoses, findings, or treatment history is relevant?
+5. Specific next steps this veteran should take based on this document
+6. Any deadlines or dates they need to track
+
+Veteran context: Branch ${ans.branch?.join(',') || 'Unknown'}, MOS ${ans.mos?.code || 'Unknown'}, Active conditions: ${conditions.map(c=>c.name).join(', ') || 'None yet'}
+
+Be specific, direct, and actionable.`;
+
     try {
-      let messages;
-      if (isImage) {
-        const base64 = content.split(',')[1];
-        const mtype = f.file.type;
-        messages = [
-          ...chatHistory.slice(-6, -1),
-          { role: 'user', content: [
-            { type: 'image', source: { type: 'base64', media_type: mtype, data: base64 } },
-            { type: 'text', text: `This veteran uploaded a document called "${f.displayName}". Analyze it in the context of their VA disability claim. Look for: denial reasons, favorable concessions VA made, missing evidence, conditions rated or denied, C&P exam findings, and anything actionable. Summarize and give specific next steps.` }
-          ]}
-        ];
+      let contentBlock;
+      if (isPDF) {
+        contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } };
+      } else if (isImage) {
+        contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } };
       } else {
-        const textContent = typeof content === 'string' ? content.substring(0, 8000) : '[Binary file — cannot extract text]';
-        messages = [
-          ...chatHistory.slice(-6, -1),
-          { role: 'user', content: `I uploaded a document called "${f.displayName}". Text content:\n\n${textContent}\n\nAnalyze this for my VA disability claim. Look for: denial reasons, favorable concessions, missing evidence, rated/denied conditions, C&P findings, and actionable next steps.` }
-        ];
+        // Fallback for unsupported types
+        hideTyping();
+        appendMsg('ai', `I can analyze PDFs and images directly. For Word documents or other file types, please copy and paste the key text into the chat and I'll analyze it for you.`);
+        return;
       }
+
+      const messages = [
+        ...chatHistory.slice(-4, -1),
+        { role: 'user', content: [contentBlock, { type: 'text', text: analysisPrompt }] }
+      ];
+
       const context = `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'}, Conditions: ${conditions.map(c=>c.name).join(', ')||'None yet'}`;
-      const data = await callClaude(messages, 1000, AYLENE_SYSTEM + context);
+      const data = await callClaude(messages, 1200, AYLENE_SYSTEM + context);
       hideTyping();
-      const reply = data.content?.[0]?.text || "I wasn't able to read that file. Try copying key text and pasting it into the chat directly.";
+      const reply = data.content?.[0]?.text || "I wasn't able to read that file. Try a PDF or image format.";
       appendMsg('ai', reply);
       chatHistory.push({ role: 'assistant', content: reply });
+      logActivity('doc_analyzed', `🤖 Aylene analyzed: ${f.displayName}`);
     } catch(err) {
       hideTyping();
-      appendMsg('ai', `I had trouble reading that file. You can copy and paste key sections directly into the chat and I'll analyze them for you.`);
+      appendMsg('ai', `I had trouble reading that file (${err.message || 'unknown error'}). Make sure it's a PDF or image under 20MB. You can also copy and paste key sections directly into the chat.`);
     }
   };
   if (f.file.type.includes('image')) {
@@ -2257,6 +2275,368 @@ async function askAboutReg() {
     document.getElementById('chatInput').value = `About ${title}: ${question}`;
     sendMessage();
   }, 500);
+}
+
+// ── EMOTIONAL LANDING MOMENT ──
+function showLandingMoment(data) {
+  const existing = document.getElementById('landingMoment');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'landingMoment';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,8,40,0.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  const condCount = data.conditions?.length || 0;
+  const pathway = data.pathway || 'DIRECT';
+  const pathwayLabel = {
+    TERA_PACT: '⚡ TERA / PACT Act pathway identified',
+    DIRECT: '📋 Direct service connection pathway',
+    SECONDARY: '🔗 Secondary service connection pathway',
+    MIXED: '🔀 Multiple pathways identified'
+  }[pathway] || '';
+  overlay.innerHTML = `
+    <div style="max-width:560px;text-align:center;color:#fff">
+      <div style="font-size:56px;margin-bottom:16px">🎯</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;margin-bottom:12px">Your Personalized Blueprint Is Ready</div>
+      <div style="font-size:28px;font-weight:700;font-family:'Oswald',sans-serif;margin-bottom:16px">${condCount} Potential Claim${condCount !== 1 ? 's' : ''} Identified</div>
+      <div style="font-size:15px;color:rgba(255,255,255,0.8);line-height:1.6;margin-bottom:14px">${data.summary || ''}</div>
+      ${pathwayLabel ? `<div style="display:inline-block;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#C9A84C;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:20px">${pathwayLabel}</div>` : ''}
+      <div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:28px;padding:0 8px">
+        What you shared matters. These conditions reflect your specific legal position — not a generic checklist. The options shown are yours to decide. Review each condition carefully and use Ask Aylene for guidance at any point.
+      </div>
+      <button onclick="closeLandingMoment()" style="background:#C9A84C;color:#002855;border:none;padding:14px 40px;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:.04em">View My Roadmap →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function closeLandingMoment() {
+  document.getElementById('landingMoment')?.remove();
+  showPage('roadmap');
+  renderRoadmap(roadmapData);
+  renderDashboard();
+  updateSidebar();
+}
+
+// ── C&P EXAM PREP ──
+function renderCPPrep() {
+  const el = document.getElementById('cpprepContent');
+  if (!el) return;
+  const conds = conditions.length ? conditions : (roadmapData?.conditions || []);
+  if (!conds.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">🎯</div>Complete your screener to generate your personalized C&P prep guide.</div>';
+    return;
+  }
+  const hasTera = roadmapData?.pathway === 'TERA_PACT';
+  let html = '';
+  if (hasTera) {
+    html += `<div class="alert alert-amber" style="margin-bottom:20px"><span>⚡</span><span><strong>TERA/PACT Act Note:</strong> Because your claim falls under the PACT Act, VA is required to schedule your C&P exam. You don't need to prove causation — your job at the exam is to accurately describe the severity of your symptoms so the examiner assigns the correct rating tier.</span></div>`;
+  }
+  html += `<div class="cpprep-intro">
+    <div class="cpprep-intro-title">The Golden Rule of C&P Exams</div>
+    <div class="cpprep-intro-body">Describe your <strong>worst days</strong> — not your average days, not your best days. The rating schedule is based on severity. If you minimize your symptoms, your rating reflects that permanently. You are not exaggerating — you are being accurate about the full impact of your condition.</div>
+  </div>`;
+  conds.forEach((c, i) => {
+    const name = c.name || '';
+    const dc = typeof getDiagnosticCode === 'function' ? getDiagnosticCode(name) : null;
+    const tips = typeof getCPTips === 'function' ? getCPTips(name) : [];
+    html += `
+    <div class="cpprep-card">
+      <div class="cpprep-card-hdr" onclick="this.nextElementSibling.classList.toggle('open')">
+        <div>
+          <div class="cpprep-cond-name">${name}</div>
+          <div style="font-size:11px;color:var(--text-sec);margin-top:2px">${dc ? 'DC ' + dc.code : ''} · Target: ${c.targetRating || '?'}%</div>
+        </div>
+        <span class="cpprep-chevron">▼</span>
+      </div>
+      <div class="cpprep-card-body ${i === 0 ? 'open' : ''}">
+        <div class="cpprep-section-title">⚠️ Common Mistakes to Avoid</div>
+        <div class="cpprep-mistake">• Saying "I'm doing okay" or "I manage fine" — even if true on that day</div>
+        <div class="cpprep-mistake">• Minimizing frequency: say "multiple times a week" not "sometimes"</div>
+        <div class="cpprep-mistake">• Forgetting to mention how it affects work, sleep, relationships, and daily activities</div>
+        <div class="cpprep-mistake">• Not mentioning medications and their side effects</div>
+        ${tips.length ? `<div class="cpprep-section-title" style="margin-top:16px">✅ What the Examiner Is Evaluating</div>${tips.map(t => `<div class="cpprep-tip">• ${t}</div>`).join('')}` : ''}
+        <div class="cpprep-section-title" style="margin-top:16px">📝 Questions to Prepare For</div>
+        ${getCPQuestions(name).map(q => `<div class="cpprep-question"><span class="cpprep-q-icon">Q</span><span>${q}</span></div>`).join('')}
+        <div class="cpprep-section-title" style="margin-top:16px">💬 Practice With Aylene</div>
+        <button class="btn btn-outline btn-sm" onclick="askAyleneAboutCP('${name.replace(/'/g, "\\'")}')">Ask Aylene to role-play this C&P exam →</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function getCPQuestions(condName) {
+  const n = (condName || '').toLowerCase();
+  if (/asthma|respiratory|pulmonary|bronch/.test(n)) return [
+    'How often do you use your rescue inhaler — on your worst days?',
+    'Have you had attacks requiring ER visits, oral steroids, or hospitalization?',
+    'What triggers your symptoms — exercise, cold air, chemicals, stress?',
+    'Does this condition affect your ability to work, exercise, or sleep?',
+    'Are you on a daily controller medication in addition to a rescue inhaler?'
+  ];
+  if (/sleep.?apnea|osa/.test(n)) return [
+    'Do you use a CPAP machine? Every night? What happens when you don\'t?',
+    'How is your sleep quality even with CPAP? Do you wake up exhausted?',
+    'Does your bed partner observe apnea episodes or loud snoring?',
+    'How does fatigue affect your daily functioning and work performance?',
+    'When were you first diagnosed and what type of doctor diagnosed you?'
+  ];
+  if (/ptsd|anxiety|mst|trauma/.test(n)) return [
+    'Describe your worst panic attack or flashback episode in detail',
+    'How many days per week do symptoms affect your ability to function?',
+    'Do you have difficulty maintaining relationships or employment?',
+    'Describe your sleep — nightmares, hypervigilance, inability to fall asleep?',
+    'Have you been hospitalized or had periods of being unable to function?'
+  ];
+  if (/tinnitus|ringing/.test(n)) return [
+    'Is the ringing constant or intermittent? Both ears or one?',
+    'Does it interfere with concentration, sleep, or conversations?',
+    'What makes it worse — stress, noise, silence?',
+    'When did it start relative to your service?'
+  ];
+  if (/back|lumbar|spine|cervical|neck/.test(n)) return [
+    'What is your range of motion on your worst days — can you bend, twist, reach?',
+    'Do you have radiculopathy — pain, numbness, or tingling down your arms or legs?',
+    'How many days per week does pain limit your activity?',
+    'What medications are you taking and do they fully control the pain?',
+    'Has this affected your ability to work, lift, sit, or stand for extended periods?'
+  ];
+  return [
+    'Describe your worst day with this condition in the past month',
+    'How frequently do you experience symptoms?',
+    'How does this condition affect your work, sleep, and relationships?',
+    'What medications or treatments are you using — are they fully effective?',
+    'Have your symptoms gotten better, worse, or stayed the same since separation?'
+  ];
+}
+
+function askAyleneAboutCP(condName) {
+  showPage('chat');
+  if (chatHistory.length === 0) initChat();
+  setTimeout(() => {
+    document.getElementById('chatInput').value = `I have a C&P exam coming up for ${condName}. Can you role-play as the VA examiner and ask me the questions I need to prepare for? I want to practice describing my worst days accurately.`;
+    sendMessage();
+  }, 600);
+}
+
+// ── DEADLINES ──
+function loadDeadlines() {
+  try { deadlines = JSON.parse(localStorage.getItem('mc_deadlines_v1') || '[]'); } catch(e) { deadlines = []; }
+}
+
+function saveDeadlineData() {
+  try { localStorage.setItem('mc_deadlines_v1', JSON.stringify(deadlines)); } catch(e) {}
+}
+
+function addDeadlineModal() {
+  document.getElementById('dlDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dlLabel').value = '';
+  document.getElementById('dlNotes').value = '';
+  document.getElementById('deadlineModal').classList.add('active');
+}
+
+function saveDeadline() {
+  const label = document.getElementById('dlLabel').value.trim();
+  const date = document.getElementById('dlDate').value;
+  const type = document.getElementById('dlType').value;
+  const notes = document.getElementById('dlNotes').value.trim();
+  if (!label || !date) { alert('Please enter a label and date.'); return; }
+  deadlines.push({ id: Date.now(), label, date, type, notes });
+  deadlines.sort((a, b) => new Date(a.date) - new Date(b.date));
+  saveDeadlineData();
+  closeModal('deadlineModal');
+  renderDeadlines();
+  logActivity('deadline_added', `📅 Deadline added: ${label}`);
+}
+
+function deleteDeadline(id) {
+  deadlines = deadlines.filter(d => d.id !== id);
+  saveDeadlineData();
+  renderDeadlines();
+}
+
+function quickAddDeadline(type, label) {
+  document.getElementById('dlLabel').value = label;
+  document.getElementById('dlType').value = type;
+  document.getElementById('dlDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dlNotes').value = '';
+  document.getElementById('deadlineModal').classList.add('active');
+}
+
+function updateDeadlineBadge() {
+  const badge = document.getElementById('deadlineBadge');
+  if (!badge) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const urgent = deadlines.filter(d => {
+    const diff = Math.round((new Date(d.date + 'T00:00:00') - today) / 86400000);
+    return diff >= 0 && diff <= 30;
+  });
+  if (urgent.length) { badge.textContent = urgent.length; badge.style.display = 'inline-flex'; }
+  else badge.style.display = 'none';
+}
+
+function renderDeadlines() {
+  loadDeadlines();
+  const el = document.getElementById('deadlinesContent');
+  if (!el) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const typeIcons = { intent: '📋', exam: '🏥', deadline: '⚖️', followup: '🔔', other: '📌' };
+  const typeLabels = { intent: 'Intent to File', exam: 'C&P Exam', deadline: 'Appeal Deadline', followup: 'Follow-Up', other: 'Other' };
+  const typeColors = { intent: 'var(--navy)', exam: 'var(--sky)', deadline: '#DC2626', followup: 'var(--gold)', other: 'var(--text-sec)' };
+
+  let html = `<div class="dl-quickadd-row">
+    <div class="dl-quick-card" onclick="quickAddDeadline('intent','Intent to File Submitted')">
+      <div class="dl-quick-icon">📋</div><div class="dl-quick-label">Log Intent to File</div><div class="dl-quick-sub">Protects your effective date</div>
+    </div>
+    <div class="dl-quick-card" onclick="quickAddDeadline('exam','C&P Exam Scheduled')">
+      <div class="dl-quick-icon">🏥</div><div class="dl-quick-label">Schedule C&P Exam</div><div class="dl-quick-sub">Track your appointment</div>
+    </div>
+    <div class="dl-quick-card" onclick="quickAddDeadline('deadline','Decision Received — 1-Year Appeal Window Opens')">
+      <div class="dl-quick-icon">⚖️</div><div class="dl-quick-label">Decision Received</div><div class="dl-quick-sub">Start 1-year appeal clock</div>
+    </div>
+  </div>`;
+
+  if (!deadlines.length) {
+    html += `<div class="empty-state" style="margin-top:24px"><div style="font-size:32px;margin-bottom:10px">📅</div>No dates tracked yet. Use the quick-add cards above or the + Add Date button.</div>`;
+    el.innerHTML = html; updateDeadlineBadge(); return;
+  }
+
+  const renderItem = (d) => {
+    const dDate = new Date(d.date + 'T00:00:00');
+    const diffDays = Math.round((dDate - today) / 86400000);
+    const isPast = diffDays < 0;
+    const isUrgent = !isPast && diffDays <= 14;
+    const dayLabel = isPast ? `${Math.abs(diffDays)} days ago` : diffDays === 0 ? 'TODAY' : `In ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    return `<div class="dl-item ${isUrgent ? 'dl-item-urgent' : ''} ${isPast ? 'dl-item-past' : ''}">
+      <div class="dl-item-icon" style="color:${typeColors[d.type] || 'var(--navy)'}">${typeIcons[d.type] || '📌'}</div>
+      <div class="dl-item-body">
+        <div class="dl-item-label">${d.label}</div>
+        <div class="dl-item-meta">${typeLabels[d.type] || d.type} · ${dDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+        ${d.notes ? `<div class="dl-item-notes">${d.notes}</div>` : ''}
+      </div>
+      <div class="dl-item-right">
+        <div class="dl-day-badge ${isUrgent ? 'dl-day-urgent' : ''} ${isPast ? 'dl-day-past' : ''}">${dayLabel}</div>
+        <button class="btn-note-del" onclick="deleteDeadline(${d.id})" title="Remove">✕</button>
+      </div>
+    </div>`;
+  };
+
+  const upcoming = deadlines.filter(d => new Date(d.date + 'T00:00:00') >= today);
+  const past = deadlines.filter(d => new Date(d.date + 'T00:00:00') < today);
+  if (upcoming.length) html += `<div class="dl-section-hdr">Upcoming</div>` + upcoming.map(renderItem).join('');
+  if (past.length) html += `<div class="dl-section-hdr" style="margin-top:20px;color:var(--text-sec)">Past Dates</div>` + past.map(renderItem).join('');
+  el.innerHTML = html;
+  updateDeadlineBadge();
+}
+
+// ── BUDDY STATEMENT GENERATOR ──
+function updateBuddyPlaceholders() {
+  const relation = document.getElementById('buddyRelation')?.value || 'fellow_veteran';
+  const ta = document.getElementById('buddyWitnessed');
+  if (!ta) return;
+  const ph = {
+    fellow_veteran: 'e.g. I witnessed [veteran] participate in live chemical agent CBRN training drills without full protective gear on at least 6 occasions between 2016 and 2018...',
+    spouse: 'e.g. As [veteran]\'s spouse, I observe daily the impact their condition has on our life — including breathing episodes, sleep disruption, and difficulty with physical activity...',
+    family: 'e.g. As [veteran]\'s sibling, I have seen significant changes in their health since they returned from service, specifically...',
+    supervisor: 'e.g. As [veteran]\'s platoon sergeant, I can attest to the in-service exposures and incidents that occurred under my command...',
+    friend: 'e.g. I have known [veteran] since before their service and have personally observed significant changes in their health and ability to function...'
+  };
+  ta.placeholder = ph[relation] || ph.fellow_veteran;
+}
+
+async function generateBuddyStatement() {
+  const author = document.getElementById('buddyAuthorName').value.trim();
+  const relation = document.getElementById('buddyRelationDetail').value.trim();
+  const condition = document.getElementById('buddyCondition').value.trim();
+  const witnessed = document.getElementById('buddyWitnessed').value.trim();
+  const impact = document.getElementById('buddyImpact').value.trim();
+  if (!author || !condition || !witnessed) { alert('Please fill in the author name, condition, and what they witnessed.'); return; }
+  const outputEl = document.getElementById('buddyOutput');
+  outputEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-sec)">✨ Generating statement...</div>';
+  document.getElementById('buddyOutputActions').style.display = 'none';
+  const veteranName = currentUser?.user_metadata?.full_name || 'the veteran';
+  const prompt = `Write a formal VA buddy statement (lay evidence) to support a VA disability claim. Format it as a proper letter.
+
+Author name: ${author}
+Author's relationship: ${relation || 'Not specified'}
+Condition being supported: ${condition}
+What they witnessed: ${witnessed}
+Impact on daily life they observed: ${impact || 'Not provided'}
+Veteran's name: ${veteranName}
+
+The statement must:
+1. Open with author identification and relationship to the veteran
+2. State the purpose (supporting VA disability claim for ${condition})
+3. Describe witnessed events/exposures with specificity (dates, locations, circumstances where possible)
+4. Describe observed daily impact on the veteran's functioning
+5. Close with a formal attestation that the statement is true to the best of the author's knowledge
+6. End with a signature block: Name, Date, Contact info placeholders
+
+Keep it factual, specific, formal, and under 500 words. Do not use brackets except for [DATE], [PHONE], [EMAIL], and [ADDRESS] placeholders.`;
+  try {
+    const data = await callClaude([{ role: 'user', content: prompt }], 800);
+    const text = data.content?.[0]?.text || '';
+    outputEl.innerHTML = `<pre class="buddy-statement-text">${text}</pre>`;
+    document.getElementById('buddyOutputActions').style.display = 'flex';
+    logActivity('buddy_generated', `✍️ Buddy statement generated for ${condition}`);
+  } catch(e) {
+    outputEl.innerHTML = `<div class="empty-state">Generation failed. Please try again.</div>`;
+  }
+}
+
+function copyBuddyStatement() {
+  const text = document.querySelector('.buddy-statement-text')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy Text', 2000);
+  });
+}
+
+function printBuddyStatement() {
+  const text = document.querySelector('.buddy-statement-text')?.textContent || '';
+  const win = window.open('', '_blank');
+  win.document.write(`<html><head><title>Buddy Statement</title><style>body{font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;white-space:pre-wrap;line-height:1.7;font-size:14px}@media print{body{padding:20px}}</style></head><body>${text.replace(/</g,'&lt;')}</body></html>`);
+  win.document.close(); win.print();
+}
+
+// ── POST-FILING TIMELINE ──
+function renderTimeline() {
+  const el = document.getElementById('timelineContent');
+  if (!el) return;
+  const stages = [
+    { icon: '📋', color: 'var(--navy)', title: 'Intent to File (ITF)', timing: 'Do this immediately — before gathering all evidence', details: ['Filing an ITF protects your effective date — the date VA starts calculating retroactive back pay.', 'You have 12 months from your ITF date to submit a complete claim. File within that window and back pay goes to the ITF date, not claim date.', 'File online at va.gov, by phone (1-800-827-1000), or at a regional office.', 'Get confirmation in writing. Screenshot or save the confirmation number.'], action: 'File at va.gov/decision-reviews/intent-to-file-a-claim/' },
+    { icon: '📬', color: 'var(--sky)', title: 'Claim Submission', timing: 'Within 12 months of your Intent to File', details: ['Submit VA Form 21-526EZ online at va.gov (fastest processing) or by mail.', 'Attach all available evidence: nexus letters, medical records, buddy statements, DD-214.', 'A Fully Developed Claim (FDC) — certifying no more evidence to submit — is processed faster.', 'Keep copies of everything and document the submission date and method.'], action: 'va.gov/disability/file-disability-claim-form-21-526ez/' },
+    { icon: '⏳', color: '#8B5CF6', title: 'VA Processing (60–200 days)', timing: 'Typical wait: 3–6 months, varies by regional office', details: ['VA will request your service treatment records (STRs) and may request records from VA health facilities.', 'If evidence is insufficient, VA must schedule a C&P exam — this is their duty to assist.', 'Check claim status anytime at va.gov/claim-or-appeal-status.', 'If VA sends a development letter requesting information, respond within 30 days.'], action: null },
+    { icon: '🏥', color: '#0891B2', title: 'C&P Exam', timing: 'Usually within 30–90 days of claim submission', details: ['You will receive a letter from VA or a contractor (LHI, QTC). Attend — missing without rescheduling can result in denial.', 'The examiner evaluates your claim, not treats you. Describe your worst days.', 'Bring a list of symptoms, medications, and how the condition affects daily life.', 'Request a copy of the exam report within 30 days — errors are common and appealable.'], action: 'Use your C&P Exam Prep guide in the sidebar →' },
+    { icon: '📄', color: 'var(--gold)', title: 'Rating Decision Letter', timing: 'Arrives by mail after processing completes', details: ['This letter shows what was approved, denied, your rating percentages, and your combined rating.', 'Read carefully — rating errors are common. Check effective date, percentages against diagnostic criteria, and denied conditions.', 'Upload your decision letter in My Records and ask Aylene to analyze it.', 'You have exactly ONE YEAR from the decision date to appeal if you disagree.'], action: 'Upload in My Records → Analyze with Aylene' },
+    { icon: '💰', color: '#16A34A', title: 'First Payment', timing: '15–30 days after decision — retroactive to your effective date', details: ['Payments are made on the first business day of each month.', 'Retroactive pay covers the period from your effective date to the decision date.', 'Update direct deposit at va.gov to avoid delays.', 'If you receive military retirement pay, review Combat-Related Special Compensation (CRSC) eligibility.'], action: null },
+    { icon: '🔄', color: 'var(--text-sec)', title: 'What Comes Next', timing: 'Ongoing — your claim journey does not end at first rating', details: ['Denied condition? Appeal within 1 year: Supplemental Claim (new evidence), Higher-Level Review, or BVA Appeal.', 'Rated lower than expected? File for an increase anytime symptoms worsen. No limit on increase filings.', 'New conditions caused by service-connected conditions can be filed as secondary at any time.', 'Review TDIU if disabilities prevent substantially gainful employment.', 'Claim Dependency allowance if you have a spouse or children — adds to monthly payment.'], action: null }
+  ];
+
+  let html = `<div class="timeline-intro">
+    <div class="timeline-intro-title">The VA Claims Journey — What to Expect</div>
+    <div class="timeline-intro-body">Most veterans are surprised by how long the process takes and how much they can influence the outcome. Here is the full picture — from filing to payment and beyond.</div>
+  </div><div class="timeline-track">`;
+
+  stages.forEach((s, i) => {
+    html += `<div class="tl-item">
+      <div class="tl-left">
+        <div class="tl-dot" style="background:${s.color}">${s.icon}</div>
+        ${i < stages.length - 1 ? '<div class="tl-line"></div>' : ''}
+      </div>
+      <div class="tl-right">
+        <div class="tl-stage-hdr" onclick="this.nextElementSibling.classList.toggle('open')">
+          <div><div class="tl-stage-title">${s.title}</div><div class="tl-stage-timing">${s.timing}</div></div>
+          <span class="tl-chevron">▼</span>
+        </div>
+        <div class="tl-stage-body ${i === 0 ? 'open' : ''}">
+          ${s.details.map(d => `<div class="tl-detail">• ${d}</div>`).join('')}
+          ${s.action ? `<div class="tl-action-link">→ ${s.action}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 // ── CLAUDE API ──
