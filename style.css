@@ -1232,3 +1232,25 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   color: var(--sky);
   cursor: pointer;
 }
+
+/* ── NEXT STEP BLOCK (Roadmap Card) ── */
+.cond-next-step {
+  margin: 10px 16px 14px;
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.cond-next-step-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.cond-next-step-text {
+  font-size: 13px;
+  color: rgba(255,255,255,.92);
+  line-height: 1.5;
+  font-weight: 500;
+}
