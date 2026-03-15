@@ -1001,10 +1001,15 @@ async function buildRoadmap() {
 
   const pathwayLines = [];
   if (hasTera) pathwayLines.push(
-    'PATHWAY: TERA/PACT ACT — Veteran has qualifying MOS (' + (ans.mos?.code||'') + ') AND documented exposure (' + (ans.exposures?.join(', ')||'') + '). ' +
-    'Under 38 CFR 3.309(e) and the PACT Act, VA has a legal duty to obtain a C&P medical opinion if one does not exist — ' +
-    'veteran does NOT need a private nexus letter. However, obtaining one is an OPTION that can strengthen the rating or push to a higher tier. ' +
-    'Mark covered conditions as type:presumptive. File simultaneously — no need to sequence presumptive claims.'
+    'PATHWAY: TERA/PACT ACT — Veteran has qualifying MOS (' + (ans.mos?.code||'') + ') AND documented toxic exposure (' + (ans.exposures?.join(', ')||'') + '). ' +
+    'Under 38 CFR 3.309(e) and the PACT Act, VA has a legal duty to obtain a C&P medical opinion if one does not exist. ' +
+    'Veteran does NOT need a private nexus letter for covered conditions, though obtaining one is an OPTION to push for a higher rating tier. ' +
+    'TERA/PACT COVERED (mark type:presumptive): Respiratory conditions (asthma, rhinitis, sinusitis, sleep apnea if caused by upper airway inflammation from exposure, COPD, bronchitis), ' +
+    'head/neck/respiratory/urinary cancers, neurological conditions directly caused by toxic chemical exposure, constrictive or obliterative bronchiolitis, granulomatous disease, sarcoidosis. ' +
+    'NOT COVERED BY TERA/PACT (do NOT mark presumptive): Mental health conditions (anxiety, PTSD, depression, adjustment disorder) — these require direct service connection with nexus. ' +
+    'NOT COVERED: Musculoskeletal conditions, general sleep disorders not from airway inflammation, tinnitus, or conditions unrelated to toxic exposure. ' +
+    'RESERVIST NOTE: Reserve component veterans qualify for TERA if exposure occurred during qualifying training or duty periods — deployment is NOT required for training-based chemical exposures. ' +
+    'File all TERA-covered conditions simultaneously at filing_order:1. Non-covered conditions file as type:direct and may need separate sequencing.'
   );
   if (hasPriorRating) pathwayLines.push(
     'PATHWAY: SECONDARY SERVICE CONNECTION — Veteran has prior ratings (' + (ans.ratedConds?.join(', ')||'') + '). ' +
@@ -1035,13 +1040,52 @@ In-Service Events: ${ans.events?.join(', ')||'None'}
 LEGAL PATHWAY (apply strictly to every condition):
 ${pathwayContext}
 
+STRATEGIC SECONDARY RELATIONSHIPS (check these BEFORE assigning condition types):
+Medical literature strongly supports the following as secondary to an anchor condition. When the veteran has both conditions, filing as secondary is often STRATEGICALLY SUPERIOR to direct because the burden of proof is lower and the anchor condition does the legal work. Use type:secondary and populate secondaryTo field:
+
+SLEEP DISORDERS:
+- Sleep Apnea secondary to PTSD: hypervigilance disrupts sleep architecture; psych medications cause weight gain that worsens OSA. Stronger than direct.
+- Sleep Apnea secondary to Asthma or Rhinitis: upper airway inflammation from respiratory conditions causes obstructive sleep apnea. Use if both present.
+- Insomnia secondary to PTSD, TBI, chronic pain, or anxiety: well-documented in literature.
+
+MENTAL HEALTH:
+- Depression secondary to chronic pain (back, knee, hip, TBI): chronic pain causing major depressive disorder is well-supported.
+- Anxiety/Depression secondary to tinnitus: tinnitus-induced psychological distress is documented.
+- Adjustment Disorder secondary to any service-connected physical condition.
+- NOTE: If veteran also has PTSD from combat/MST, file PTSD as direct under 38 CFR 3.304(f) — PTSD is stronger as direct in those cases.
+
+CARDIOVASCULAR:
+- Hypertension secondary to PTSD: multiple studies show PTSD drives chronic sympathetic nervous system activation causing elevated BP. File as secondary to PTSD where possible.
+- Hypertension secondary to sleep apnea (if sleep apnea is SC): OSA causes secondary hypertension.
+
+GASTROINTESTINAL:
+- GERD / IBS secondary to PTSD or anxiety: stress-related GI conditions are well-documented as secondary.
+- Peptic ulcer secondary to PTSD or NSAIDs taken for service-connected pain.
+
+MUSCULOSKELETAL CASCADES:
+- Knee/hip conditions secondary to service-connected back: altered gait from back pain causes secondary joint degeneration.
+- Foot/ankle conditions secondary to knee (same logic).
+- Shoulder conditions secondary to cervical spine SC condition.
+
+NEUROLOGICAL:
+- Migraines secondary to TBI or PTSD: strong literature support.
+- Peripheral neuropathy secondary to diabetes (if diabetes is SC).
+- Radiculopathy secondary to service-connected spinal condition.
+
+OTHER:
+- Erectile dysfunction secondary to PTSD, diabetes, or spinal conditions: often higher rating and stronger case than direct.
+- Obesity secondary to PTSD or antipsychotic/antidepressant medications (if SC): relevant for BMI-related secondary conditions.
+
+FILING SEQUENCE RULE FOR SECONDARY: Always assign the anchor condition filing_order:1. Secondary conditions get filing_order:2 or higher. Advise veteran to wait for anchor rating before submitting secondary, OR file simultaneously with a note that secondary claim is contingent.
+
 RULES:
 - 2-4 winnable conditions only, specific to this MOS and exposure history
+- Before assigning type:direct, always check if a secondary pathway exists using the relationships above — if it does, secondary is usually the stronger strategic choice
 - filing_order: integer 1-4 indicating sequence to file. Simultaneous = same number. Secondary must be higher than anchor.
-- options: 2-3 real strategic choices veteran has (not instructions — actual decision points they face)
-- For TERA/presumptive: options MUST include both "File now — VA required to schedule C&P at no cost" AND "Optionally obtain private nexus letter to target higher rating tier"
+- options: 2-3 real strategic choices the veteran faces (e.g. "File as secondary to PTSD — stronger case" vs "File as direct — requires nexus letter")
+- For TERA/presumptive: options MUST include "File now — VA required to schedule C&P at no cost" AND "Optionally obtain private nexus letter to target higher rating tier"
 - strategy: why this filing approach makes sense for this specific veteran's legal position
-- targetRating: CPAP required=50, daily bronchodilator=30, tinnitus=10, mild-moderate anxiety/PTSD=30-50, severe=70
+- targetRating: CPAP required=50, daily bronchodilator=30, tinnitus=10, mild-moderate anxiety/PTSD=30-50, severe=70, hypertension=10-60 based on diastolic readings
 
 RETURN THIS JSON STRUCTURE (minified):
 {"summary":"2-3 sentences on legal position and overall strategy","pathway":"TERA_PACT|DIRECT|SECONDARY|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for TERA: note VA duty to obtain C&P opinion; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
@@ -1146,6 +1190,18 @@ function renderRoadmap(data) {
       <span class="legend-item"><span class="legend-dot" style="background:#16A34A"></span>Lay Evidence</span>
     </div>`;
 
+  if (data.pathway === 'TERA_PACT' || data.pathway === 'MIXED') {
+    html += `<div class="tera-pathway-banner">
+      <div class="tera-banner-left">
+        <div class="tera-banner-label">⚡ TERA / PACT Act Pathway Active</div>
+        <div class="tera-banner-body">Your MOS and exposure history qualifies under the Toxic Exposures Risk Activity (TERA) program and the PACT Act. For covered conditions, <strong>VA is legally required to obtain a medical opinion</strong> — you do not need a private nexus letter to initiate your claim. A private nexus letter remains an option to target a higher rating tier.</div>
+      </div>
+      <div class="tera-banner-right">
+        <div class="tera-stat"><div class="tera-stat-val">No nexus letter required</div><div class="tera-stat-label">VA must get C&P opinion</div></div>
+        <div class="tera-stat"><div class="tera-stat-val">38 CFR 3.309(e)</div><div class="tera-stat-label">PACT Act + TERA</div></div>
+      </div>
+    </div>`;
+  }
   if (data.pact_note) html += `<div class="alert alert-amber"><span>⚠️</span><span><strong>PACT Act:</strong> ${data.pact_note}</span></div>`;
   if (data.tdiu) html += `<div class="alert alert-green"><span>💡</span><span><strong>TDIU Opportunity:</strong> ${data.tdiu_note||'You may qualify for Total Disability based on Individual Unemployability.'}</span></div>`;
 
