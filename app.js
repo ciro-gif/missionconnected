@@ -1048,7 +1048,7 @@ RETURN THIS JSON STRUCTURE (minified):
 MINIFIED JSON ONLY.`;
 
   try {
-    const data = await callClaude([{role:'user',content:prompt}], 1200);
+    const data = await callClaude([{role:'user',content:prompt}], 2000);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -2641,7 +2641,7 @@ function renderTimeline() {
 
 // ── CLAUDE API ──
 async function callClaude(messages, maxTokens = 800, system = '', retries = 2) {
-  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 1500), messages };
+  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 3000), messages };
   if (system) body.system = system;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
