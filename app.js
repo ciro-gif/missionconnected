@@ -989,42 +989,213 @@ async function buildRoadmap() {
 
   const mosLabel = ans.mos?.label || ans.mos?.title || '';
 
-  // ── PATHWAY CLASSIFIER ──
-  // Determines veteran's legal position before prompt generation.
-  // TERA only applies when MOS flag + actual qualifying exposure exist together.
-  const hasTera = ans.mos?.tera && (
-    ans.exposures?.some(e => /chemical|solvent|cbrn|burn.?pit|agent.?orange|radiation|contaminated|asbestos|lead|depleted/i.test(e)) ||
-    ans.deployments?.some(d => /gulf|vietnam|korea|oif|oef|swa|southwest.?asia/i.test(d))
-  );
-  const hasPriorRating = ans.ratedConds?.length > 0;
-  const hasCombatService = ans.events?.some(e => /combat|deployment|hostile|idf|mortar|ied|firefight|direct.?fire/i.test(e));
+  // ══════════════════════════════════════════════════════════════
+  // COMPREHENSIVE PATHWAY CLASSIFIER
+  // Covers all eras, all branches, all major VA legal pathways.
+  // Each flag is mutually informed — a veteran can trigger multiple.
+  // ══════════════════════════════════════════════════════════════
 
+  const deps = ans.deployments || [];
+  const exps = ans.exposures || [];
+  const evts = ans.events || [];
+  const syms = ans.symptoms || [];
+  const dx   = ans.diagnoses || [];
+  const branch = (ans.branch || []).join('/').toLowerCase();
+  const moscode = (ans.mos?.code || '').toUpperCase();
+  const allText = [...deps, ...exps, ...evts, ...syms, ...dx].join(' ').toLowerCase();
+
+  // ── ERA / DEPLOYMENT FLAGS ──
+  const isPostGulfWar = deps.some(d => /gulf|kuwait|iraq|saudi|bahrain|qatar|oman|uae|jordan|lebanon|syria|yemen|djibouti|afghanistan|uzbekistan|sinai|egypt|somalia/i.test(d)) ||
+    (ans.startYear >= 1990 && allText.includes('southwest asia'));
+  const isVietnamEra = deps.some(d => /vietnam|thailand|korea.*dmz|laos|cambodia|guam/i.test(d)) ||
+    (ans.startYear >= 1962 && ans.endYear <= 1975);
+  const isKoreanEra = deps.some(d => /korea/i.test(d)) && (ans.startYear >= 1950 && ans.endYear <= 1954);
+  const isPost911 = deps.some(d => /afghanistan|iraq|oif|oef|enduring|freedom|iraqi/i.test(d)) ||
+    (ans.startYear >= 2001 && isPostGulfWar);
+  const hasBurnPit = exps.some(e => /burn.?pit|open.?air|airborne.?hazard/i.test(e)) || isPost911;
+
+  // ── SPECIFIC EXPOSURE FLAGS ──
+  const hasAgentOrange = isVietnamEra ||
+    deps.some(d => /vietnam|thailand|korea.*dmz|johnston.?island|guam/i.test(d)) ||
+    exps.some(e => /agent.?orange|herbicide|dioxin/i.test(e));
+  const hasCampLejeune = evts.some(e => /lejeune/i.test(e)) || exps.some(e => /lejeune|contaminated.?water/i.test(e)) ||
+    (branch.includes('marine') && ans.startYear >= 1953 && ans.startYear <= 1987);
+  const hasRadiation = exps.some(e => /radiation|nuclear|atomic|depleted.?uranium|ionizing/i.test(e)) ||
+    evts.some(e => /hiroshima|nagasaki|nuclear.?test|enewetak|palomares|thule/i.test(e));
+  const hasMustardGas = exps.some(e => /mustard.?gas|lewisite|vesicant|blister.?agent/i.test(e));
+  const hasAsbestos = exps.some(e => /asbestos/i.test(e)) ||
+    (branch.includes('navy') || branch.includes('marine') || branch.includes('coast')) ||
+    /mm|en|ht|mr|dc|bf|boiler|engine|shipyard|seabee|11c|combat.?engineer|12b/i.test(moscode + ' ' + allText);
+  const hasPfas = exps.some(e => /pfas|afff|aqueous.?film|firefighting.?foam/i.test(e)) ||
+    (branch.includes('air force') || branch.includes('coast')) ||
+    /fire.?fight|crash.?rescue|afsc.*1d|3e/i.test(allText);
+
+  // TERA: CONUS training toxic exposure (NOT a PACT presumptive — direct SC pathway)
+  const hasTeraTraining = ans.mos?.tera &&
+    exps.some(e => /chemical|solvent|cbrn|sarin|vx|nerve.?agent|mustard|lead|depleted/i.test(e)) &&
+    !isPostGulfWar && !isVietnamEra;
+
+  // TRUE PACT ACT (overseas qualifying service or specific covered exposures)
+  const hasPactAct = isPostGulfWar || hasBurnPit || hasAgentOrange || hasCampLejeune || hasRadiation || hasMustardGas;
+
+  // ── MOS / BRANCH OCCUPATIONAL FLAGS ──
+  const highNoiseExposure =
+    /11b|11c|11x|13b|13f|13m|19d|19k|15t|15u|31b|0311|0331|0341|0351|0621|infantry|armor|cav|artillery|tanker|paratrooper/i.test(moscode + ' ' + mosLabel) ||
+    /gunner|pilot|crew.?chief|door.?gunner|aviation.?mechanic|naval.?gunfire|deck.?crew|abh|abe|machinist|boilerman|engineman/i.test(mosLabel + ' ' + allText) ||
+    /heavy.?equipment|combat.?engineer|seabee|explosive|ordinance|eod/i.test(mosLabel + ' ' + allText);
+
+  const heavyPhysicalMOS =
+    /11b|11c|19d|19k|31b|88m|92a|68w|0311|0331|0621|infantry|mp|military.?police|combat|paratrooper|ranger|special.?forces|sapper|engineer|mechanic|91|92/i.test(moscode + ' ' + mosLabel) ||
+    branch.includes('marine') || /seabee|cb|construction.?battalion/i.test(allText);
+
+  const chemBioMOS = /74d|74b|cbrn|chemical|biological|radiological|nuclear|nuclear.?medical|aoc|chemical.?officer/i.test(moscode + ' ' + mosLabel);
+
+  const intelAdminMOS = /35|96|09|42a|56m|25u|15p|admin|intel|signal|s2|g2|j2|analyst|linguist/i.test(moscode + ' ' + mosLabel);
+
+  const medicalMOS = /68w|68|91|corpsman|hm|medic|pa|nurse|medical|dental|68d|68e|68f|68g|68j|68k|68p|68q|68r|68s|68t|68v|68w|68x|68y/i.test(moscode + ' ' + mosLabel);
+
+  // ── SPECIAL CIRCUMSTANCES ──
+  const hasMST = evts.some(e => /sexual.?trauma|mst|assault|rape|harassment/i.test(e)) ||
+    syms.some(s => /mst|sexual.?trauma/i.test(s));
+  const isPOW = evts.some(e => /prisoner.?of.?war|pow|captured|internment/i.test(e));
+  const hasCombatService = evts.some(e => /combat|hostile|idf|mortar|ied|firefight|direct.?fire|ambush|convoy.?attack/i.test(e)) || isPost911;
+  const hasPriorRating = ans.ratedConds?.length > 0;
+  const isReserveGuard = /reserve|guard|ng|national.?guard|arng|usar|usnr|usmcr|afrc|ang|uscgr/i.test(ans.component + ' ' + allText);
+
+  // ── BUILD PATHWAY CONTEXT ──
   const pathwayLines = [];
-  if (hasTera) pathwayLines.push(
-    'PATHWAY: TERA/PACT ACT — Veteran has qualifying MOS (' + (ans.mos?.code||'') + ') AND documented toxic exposure (' + (ans.exposures?.join(', ')||'') + '). ' +
-    'Under 38 CFR 3.309(e) and the PACT Act, VA has a legal duty to obtain a C&P medical opinion if one does not exist. ' +
-    'Veteran does NOT need a private nexus letter for covered conditions, though obtaining one is an OPTION to push for a higher rating tier. ' +
-    'TERA/PACT COVERED (mark type:presumptive): Respiratory conditions (asthma, rhinitis, sinusitis, sleep apnea if caused by upper airway inflammation from exposure, COPD, bronchitis), ' +
-    'head/neck/respiratory/urinary cancers, neurological conditions directly caused by toxic chemical exposure, constrictive or obliterative bronchiolitis, granulomatous disease, sarcoidosis. ' +
-    'NOT COVERED BY TERA/PACT (do NOT mark presumptive): Mental health conditions (anxiety, PTSD, depression, adjustment disorder) — these require direct service connection with nexus. ' +
-    'NOT COVERED: Musculoskeletal conditions, general sleep disorders not from airway inflammation, tinnitus, or conditions unrelated to toxic exposure. ' +
-    'RESERVIST NOTE: Reserve component veterans qualify for TERA if exposure occurred during qualifying training or duty periods — deployment is NOT required for training-based chemical exposures. ' +
-    'File all TERA-covered conditions simultaneously at filing_order:1. Non-covered conditions file as type:direct and may need separate sequencing.'
+
+  // 1. PACT ACT (highest priority — covers most post-1990 veterans with overseas service)
+  if (hasPactAct) {
+    let pactDetail = '';
+    if (hasAgentOrange) pactDetail += 'Agent Orange/herbicide exposure (Vietnam/Thailand/Korea DMZ). Covered conditions: Type 2 diabetes, ischemic heart disease, Parkinson's, peripheral neuropathy, various cancers, hypertension (added 2025), MGUS (added 2025), AL amyloidosis, hypothyroidism, bladder cancer, Parkinsonism, bladder cancer, B-cell leukemia. ';
+    if (isPostGulfWar && !isPost911) pactDetail += 'Gulf War service (SW Asia 1990-present). Covered: Chronic Fatigue Syndrome, fibromyalgia, functional GI disorders (IBS, dyspepsia), undiagnosed multi-symptom illnesses (Gulf War Syndrome) — do NOT require specific diagnosis, just chronic 10%+ symptoms for 6 months. ';
+    if (isPost911 || hasBurnPit) pactDetail += 'Post-9/11/burn pit exposure. Covered: Respiratory conditions (constrictive bronchiolitis, obliterative bronchiolitis, constrictive pericarditis, sarcoidosis, sinusitis, rhinitis, laryngitis, pharyngitis, rhinosinusitis), cancers (head/neck, respiratory, GI, urinary, genitourinary, reproductive, lymphatic, blood cancers including leukemias/myeloma added Jan 2025), granulomatous disease. ';
+    if (hasCampLejeune) pactDetail += 'Camp Lejeune contaminated water (1953-1987): 8 covered conditions — non-Hodgkin lymphoma, adult leukemia, aplastic anemia, bladder cancer, kidney cancer, liver cancer, multiple myeloma, Parkinson's disease. Also: PFAS-related conditions if applicable. ';
+    if (hasRadiation) pactDetail += 'Ionizing radiation exposure. Covered: 21 specific cancers. Must have participated in atmospheric nuclear testing, post-WWII Japan occupation, or other qualifying radiation-risk activities. ';
+    if (hasMustardGas) pactDetail += 'Mustard gas/Lewisite experimental exposure. Covered: Chronic laryngitis, rhinitis, sinusitis, anosmia, bronchitis, asthma, COPD, keratitis, corneal scarring, skin cancer at exposure sites. ';
+    pathwayLines.push(
+      'PATHWAY: PACT ACT PRESUMPTIVE (' + pactDetail.trim() + ') ' +
+      'Under the PACT Act and relevant CFR sections, covered conditions are PRESUMPTIVE — VA must schedule C&P, no private nexus letter required to file. ' +
+      'Mark covered conditions type:presumptive. Filing options: (A) file immediately — VA duty to assist applies, or (B) get private IMO for higher rating tier. ' +
+      'NOT COVERED by PACT presumptive: mental health (anxiety/depression/PTSD — these are direct SC), musculoskeletal, tinnitus. ' +
+      'NOTE FOR RESERVE/GUARD: Qualifies if exposure occurred during qualifying active duty periods or federally ordered training where exposure was documented.'
+    );
+  }
+
+  // 2. TERA TRAINING (CONUS toxic exposure — direct SC, not presumptive)
+  if (hasTeraTraining) {
+    pathwayLines.push(
+      'PATHWAY: TERA TRAINING EXPOSURE (CONUS DIRECT SERVICE CONNECTION) — MOS ' + moscode + ' has documented toxic training exposure (' + exps.join(', ') + '). ' +
+      'CRITICAL: This is NOT PACT Act presumptive. This is a direct service connection claim supported by TERA duty-to-assist (38 CFR 3.303). ' +
+      'Veteran must prove: (1) diagnosis, (2) in-service chemical exposure event, (3) medical nexus linking specific exposure to diagnosis. ' +
+      'VA has duty to consider the exposure when evaluating, but veteran carries the burden. ' +
+      'A specialist nexus letter (pulmonologist/toxicologist) connecting the specific agent to the specific condition is STRONGLY recommended. ' +
+      'Use type:direct for all conditions. Use pact_note to explain TERA duty-to-assist, NOT presumptive language.'
+    );
+  }
+
+  // 3. ASBESTOS (direct SC — no PACT coverage)
+  if (hasAsbestos && !hasPactAct) {
+    pathwayLines.push(
+      'OCCUPATIONAL HAZARD: ASBESTOS EXPOSURE — ' + (branch.includes('navy') || branch.includes('coast') ? 'Navy/Coast Guard shipboard service involves high asbestos exposure in engine rooms, boiler rooms, and sleeping quarters.' : 'Service occupation involved asbestos-containing materials.') + ' ' +
+      'PACT Act does NOT cover asbestos. File as type:direct. ' +
+      'Covered conditions: mesothelioma, asbestosis, lung cancer, pleural disease, laryngeal cancer. ' +
+      'Evidence needed: ship names and service dates (for Navy), MOS exposure documentation, current pulmonology/oncology diagnosis, nexus letter. ' +
+      'Asbestos-related cancers are NOT automatically presumptive — nexus letter is essential.'
+    );
+  }
+
+  // 4. PFAS EXPOSURE (direct SC or presumptive depending on regulation)
+  if (hasPfas && !hasPactAct) {
+    pathwayLines.push(
+      'OCCUPATIONAL HAZARD: PFAS/AFFF EXPOSURE — ' + (branch.includes('air force') ? 'Air Force firefighters and crash rescue personnel had high AFFF/PFAS exposure.' : 'Service involved firefighting foam (AFFF) containing PFAS chemicals.') + ' ' +
+      'PFAS is not yet a PACT Act presumptive — file as type:direct with exposure documentation. ' +
+      'Linked conditions: thyroid disease, kidney cancer, testicular cancer, liver disease, immune dysfunction. ' +
+      'VA is expanding PFAS research — document exposure specifically and obtain specialist nexus letter.'
+    );
+  }
+
+  // 5. MST (liberal evidentiary standard — no corroboration required)
+  if (hasMST) {
+    pathwayLines.push(
+      'PATHWAY: MILITARY SEXUAL TRAUMA (MST) — Under 38 CFR 3.304(f)(5), MST-related PTSD and mental health conditions receive a LIBERALIZED evidentiary standard. ' +
+      'VA does NOT require corroborating evidence of the assault/trauma. Markers of behavioral change, performance records, medical records, and lay statements are sufficient. ' +
+      'DO NOT require service records to document the MST event itself. ' +
+      'Covered conditions: PTSD (primary), depression, anxiety, MST-related physical conditions (fibromyalgia, IBS, pelvic pain, hypertension). ' +
+      'Use type:lay for MST-related PTSD. Buddy statements and personal statements carry significant weight. ' +
+      'Filing tip: Request Military Personnel Records for any documented behavioral/performance changes following the incident period as supportive evidence.'
+    );
+  }
+
+  // 6. POW (specific presumptive list)
+  if (isPOW) {
+    pathwayLines.push(
+      'PATHWAY: PRISONER OF WAR — Under 38 CFR 3.309(c), POW veterans receive a specific presumptive list. ' +
+      'Covered (mark type:presumptive): psychosis, dysthymic disorder, anxiety, organic mental conditions, post-traumatic osteoarthritis, stroke, residuals of stroke, hypertension, atherosclerotic heart disease, heart disease due to avitaminosis, helminthiasis, peripheral neuropathy, irritable bowel syndrome, peptic ulcer disease, B12 deficiency, malnutrition, optic neuropathy, pellagra (or other nutritional deficiency), all tropical diseases. ' +
+      'Veterans held for 30+ days get additional presumptions: all cancers. ' +
+      'Evidence needed: POW documentation in service records or JPAC records, current diagnosis.'
+    );
+  }
+
+  // 7. COMBAT/PTSD LIBERAL STANDARD
+  if (hasCombatService && !hasMST) {
+    pathwayLines.push(
+      'PATHWAY: COMBAT SERVICE — PTSD LIBERAL STANDARD — Under 38 CFR 3.304(f), combat veterans receive liberalized evidentiary standard for PTSD. ' +
+      'If service records confirm engagement with the enemy or presence in a combat zone, VA must accept personal statement as evidence of the in-service stressor. ' +
+      'No requirement to corroborate in-service stressor with official records. Buddy statements strengthen the claim significantly. ' +
+      'PTSD should be filed as type:direct. Also consider: TBI (from blast exposure), tinnitus/hearing loss (from weapons fire), and musculoskeletal from combat loads.'
+    );
+  }
+
+  // 8. MOS-SPECIFIC OCCUPATIONAL HAZARDS (all veterans, all branches)
+  const mosHazards = [];
+  if (highNoiseExposure) mosHazards.push(
+    'HIGH NOISE EXPOSURE MOS — VA Duty MOS Noise Exposure Listing concedes hazardous noise exposure for this MOS. ' +
+    'Tinnitus and hearing loss claims are STRONG for this veteran — VA will not contest the in-service noise event. ' +
+    'Evidence needed: current audiogram, statement of onset, Duty MOS listing as supporting documentation. ' +
+    'Tinnitus: always file at 10%. Hearing loss: file simultaneously, rated on speech recognition scores.'
   );
-  if (hasPriorRating) pathwayLines.push(
-    'PATHWAY: SECONDARY SERVICE CONNECTION — Veteran has prior ratings (' + (ans.ratedConds?.join(', ')||'') + '). ' +
-    'Conditions caused or aggravated by rated conditions = type:secondary. ' +
-    'Assign filing_order AFTER primary condition. Secondary claims are strongest after primary is rated.'
+  if (heavyPhysicalMOS) mosHazards.push(
+    'HEAVY PHYSICAL MOS — High incidence of musculoskeletal conditions from ruck marching, load-bearing, vehicle operations, parachuting. ' +
+    'Back (lumbar/cervical), knees, hips, shoulders, ankles are high-probability direct service connection claims. ' +
+    'Evidence: STRs showing in-service treatment, current imaging, range of motion testing at C&P. ' +
+    'Secondary cascade: knee secondary to back, ankle secondary to knee — document all.'
   );
-  if (hasCombatService) pathwayLines.push(
-    'PATHWAY: COMBAT/PTSD LIBERAL STANDARD — Under 38 CFR 3.304(f), personal statement + buddy letters carry significant weight. ' +
-    'No requirement to corroborate in-service stressor with service records for PTSD.'
+  if (medicalMOS) mosHazards.push(
+    'MEDICAL/CORPSMAN MOS — High risk for PTSD from secondary trauma and traumatic patient care. ' +
+    'Also: bloodborne pathogen exposure (hepatitis B/C), musculoskeletal from patient lifting, burnout/depression. ' +
+    'PTSD secondary trauma is documentable through patient case load, deployment records, and treating provider statements.'
   );
-  if (!hasTera && !hasPriorRating) pathwayLines.push(
-    'PATHWAY: DIRECT SERVICE CONNECTION — Must establish 3-legged stool: current diagnosis + in-service event + medical nexus. ' +
-    'Private nexus letter from treating physician strongly recommended. Mark as type:direct.'
+  if (intelAdminMOS && !hasCombatService) mosHazards.push(
+    'ADMINISTRATIVE/INTEL MOS — Lower physical hazard profile, but: musculoskeletal from prolonged sitting/computer work, ' +
+    'mental health from secondary trauma exposure (intel analysts), and deployment-related PTSD if applicable. ' +
+    'Carpal tunnel and cervical strain from desk work can be direct SC with STR documentation.'
   );
-  const pathwayContext = pathwayLines.join('\n');
+  if (mosHazards.length) pathwayLines.push('MOS-SPECIFIC HAZARDS:
+' + mosHazards.join('
+'));
+
+  // 9. DIRECT SC (fallback for any veteran)
+  if (!hasPactAct && !hasTeraTraining) {
+    pathwayLines.push(
+      'PATHWAY: DIRECT SERVICE CONNECTION (ALL CONDITIONS NOT COVERED ABOVE) — ' +
+      '3-legged stool: (1) current diagnosis, (2) in-service event/incident/exposure, (3) medical nexus linking the two. ' +
+      'Private nexus letter from treating physician strongly recommended for any condition not covered by presumptive pathway. ' +
+      'Service treatment records (STRs) are the foundation — request them before filing.'
+    );
+  }
+
+  // 10. SECONDARY SC (for any veteran with prior ratings)
+  if (hasPriorRating) {
+    pathwayLines.push(
+      'PATHWAY: SECONDARY SERVICE CONNECTION — Veteran has prior SC ratings (' + ans.ratedConds.join(', ') + '). ' +
+      'New conditions caused or aggravated by rated conditions = type:secondary. Assign filing_order AFTER anchor. ' +
+      'This is often strategically superior to direct SC — burden of proof is lower.'
+    );
+  }
+
+  const pathwayContext = pathwayLines.join('\n\n');
 
   const prompt = `You are a VA claims strategist generating a personalized legal roadmap. Return ONLY minified JSON, no markdown.
 
@@ -1037,61 +1208,35 @@ Symptoms: ${ans.symptoms?.join(', ')||'None'}
 Diagnoses: ${ans.diagnoses?.join(', ')||'None'}
 In-Service Events: ${ans.events?.join(', ')||'None'}
 
-LEGAL PATHWAY (apply strictly to every condition):
+LEGAL PATHWAY ANALYSIS (apply strictly — each section below is based on this veteran's specific profile):
 ${pathwayContext}
 
-STRATEGIC SECONDARY RELATIONSHIPS (check these BEFORE assigning condition types):
-Medical literature strongly supports the following as secondary to an anchor condition. When the veteran has both conditions, filing as secondary is often STRATEGICALLY SUPERIOR to direct because the burden of proof is lower and the anchor condition does the legal work. Use type:secondary and populate secondaryTo field:
-
-SLEEP DISORDERS:
-- Sleep Apnea secondary to PTSD: hypervigilance disrupts sleep architecture; psych medications cause weight gain that worsens OSA. Stronger than direct.
-- Sleep Apnea secondary to Asthma or Rhinitis: upper airway inflammation from respiratory conditions causes obstructive sleep apnea. Use if both present.
-- Insomnia secondary to PTSD, TBI, chronic pain, or anxiety: well-documented in literature.
-
-MENTAL HEALTH:
-- Depression secondary to chronic pain (back, knee, hip, TBI): chronic pain causing major depressive disorder is well-supported.
-- Anxiety/Depression secondary to tinnitus: tinnitus-induced psychological distress is documented.
-- Adjustment Disorder secondary to any service-connected physical condition.
-- NOTE: If veteran also has PTSD from combat/MST, file PTSD as direct under 38 CFR 3.304(f) — PTSD is stronger as direct in those cases.
-
-CARDIOVASCULAR:
-- Hypertension secondary to PTSD: multiple studies show PTSD drives chronic sympathetic nervous system activation causing elevated BP. File as secondary to PTSD where possible.
-- Hypertension secondary to sleep apnea (if sleep apnea is SC): OSA causes secondary hypertension.
-
-GASTROINTESTINAL:
-- GERD / IBS secondary to PTSD or anxiety: stress-related GI conditions are well-documented as secondary.
-- Peptic ulcer secondary to PTSD or NSAIDs taken for service-connected pain.
-
-MUSCULOSKELETAL CASCADES:
-- Knee/hip conditions secondary to service-connected back: altered gait from back pain causes secondary joint degeneration.
-- Foot/ankle conditions secondary to knee (same logic).
-- Shoulder conditions secondary to cervical spine SC condition.
-
-NEUROLOGICAL:
-- Migraines secondary to TBI or PTSD: strong literature support.
-- Peripheral neuropathy secondary to diabetes (if diabetes is SC).
-- Radiculopathy secondary to service-connected spinal condition.
-
-OTHER:
-- Erectile dysfunction secondary to PTSD, diabetes, or spinal conditions: often higher rating and stronger case than direct.
-- Obesity secondary to PTSD or antipsychotic/antidepressant medications (if SC): relevant for BMI-related secondary conditions.
-
-FILING SEQUENCE RULE FOR SECONDARY: Always assign the anchor condition filing_order:1. Secondary conditions get filing_order:2 or higher. Advise veteran to wait for anchor rating before submitting secondary, OR file simultaneously with a note that secondary claim is contingent.
+STRATEGIC SECONDARY RELATIONSHIPS (always check BEFORE assigning type:direct):
+- Sleep Apnea secondary to PTSD (hypervigilance/medication weight gain) OR secondary to Asthma/Rhinitis (airway inflammation) — stronger than direct
+- Depression secondary to chronic pain, tinnitus, or any SC physical condition — well-supported
+- Hypertension secondary to PTSD (sympathetic activation) or secondary to OSA — file this way if PTSD/OSA is SC
+- GERD/IBS secondary to PTSD or anxiety — stress-related GI is well-documented
+- Knee/hip secondary to SC back (altered gait) — cascade claims
+- Migraines secondary to TBI or PTSD — strong literature
+- Radiculopathy secondary to SC spinal condition — always secondary if spine is SC
+- Erectile dysfunction secondary to PTSD, diabetes, or spinal — stronger as secondary
+RULE: If a secondary pathway exists, it is usually strategically superior. Assign anchor filing_order:1, secondary filing_order:2+.
 
 RULES:
-- 2-4 winnable conditions only, specific to this MOS and exposure history
-- Before assigning type:direct, always check if a secondary pathway exists using the relationships above — if it does, secondary is usually the stronger strategic choice
-- filing_order: integer 1-4 indicating sequence to file. Simultaneous = same number. Secondary must be higher than anchor.
-- options: 2-3 real strategic choices the veteran faces (e.g. "File as secondary to PTSD — stronger case" vs "File as direct — requires nexus letter")
-- For TERA/presumptive: options MUST include "File now — VA required to schedule C&P at no cost" AND "Optionally obtain private nexus letter to target higher rating tier"
-- strategy: why this filing approach makes sense for this specific veteran's legal position
-- targetRating: CPAP required=50, daily bronchodilator=30, tinnitus=10, mild-moderate anxiety/PTSD=30-50, severe=70, hypertension=10-60 based on diastolic readings
+- Generate 2-4 winnable, specific conditions based on this veteran's unique profile — not generic conditions
+- Prioritize presumptive conditions first (easiest to win), then strong direct SC, then secondary
+- Before type:direct, check secondary relationships above
+- options: 2-3 real decision points (e.g. "File now with VA C&P only" vs "Get private nexus letter first for higher rating")
+- For PACT presumptive: options MUST include "File now — VA required to schedule C&P, no nexus letter needed" AND "Optionally get private IMO to target higher rating tier"
+- For TERA direct: options MUST note "nexus letter strongly recommended" vs "file without one and risk lower rating"
+- targetRating: CPAP=50, daily bronchodilator=30, tinnitus=10, mild-moderate PTSD/anxiety=30-50, severe PTSD=70, hearing loss=0-100 per audiogram, hypertension=10-60, diabetes=10-20 controlled
+- pathway field must accurately reflect the veteran's situation: PACT_ACT | TERA_DIRECT | AGENT_ORANGE | GULF_WAR | CAMP_LEJEUNE | RADIATION | MST | POW | COMBAT_DIRECT | DIRECT | MIXED
 
 RETURN THIS JSON STRUCTURE (minified):
-{"summary":"2-3 sentences on legal position and overall strategy","pathway":"TERA_PACT|DIRECT|SECONDARY|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for TERA: note VA duty to obtain C&P opinion; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
+{"summary":"2-3 sentences on legal position and overall strategy","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for presumptive: note VA duty; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
 MINIFIED JSON ONLY.`;
 
-  try {
+    try {
     const data = await callClaude([{role:'user',content:prompt}], 2000);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
@@ -1190,15 +1335,30 @@ function renderRoadmap(data) {
       <span class="legend-item"><span class="legend-dot" style="background:#16A34A"></span>Lay Evidence</span>
     </div>`;
 
-  if (data.pathway === 'TERA_PACT' || data.pathway === 'MIXED') {
-    html += `<div class="tera-pathway-banner">
+  // Pathway banner — different message per pathway type
+  const pathwayBanners = {
+    PACT_ACT: { label:'⚡ PACT Act Presumptive Pathway', body:'Your service qualifies under the PACT Act (2022). For covered conditions, <strong>VA is legally required to obtain a medical opinion</strong> — no private nexus letter needed to file. A nexus letter remains an option to push for a higher rating tier.', stat1:'No nexus letter required', stat1sub:'VA must schedule C&P', stat2:'38 CFR 3.309(e)', stat2sub:'PACT Act 2022', color:'var(--gold)' },
+    AGENT_ORANGE: { label:'🍃 Agent Orange Presumptive Pathway', body:'Your Vietnam-era/herbicide exposure qualifies under Agent Orange presumptives. For covered conditions including Type 2 diabetes, ischemic heart disease, Parkinson's, and cancers, <strong>VA presumes service connection</strong> — no nexus letter required.', stat1:'No nexus letter required', stat1sub:'38 CFR 3.309(e)', stat2:'Agent Orange', stat2sub:'Vietnam era', color:'#86EFAC' },
+    GULF_WAR: { label:'🏜️ Gulf War Illness Presumptive Pathway', body:'Your Southwest Asia service qualifies for Gulf War presumptives. Chronic Fatigue Syndrome, fibromyalgia, functional GI disorders, and undiagnosed multi-symptom illnesses do not require a specific diagnosis — <strong>chronic symptoms for 6+ months at 10%+ is sufficient</strong>.', stat1:'No diagnosis required', stat1sub:'Chronic symptoms qualify', stat2:'38 CFR 3.317', stat2sub:'Gulf War Illness', color:'#FDE68A' },
+    CAMP_LEJEUNE: { label:'💧 Camp Lejeune Contaminated Water Pathway', body:'Your Camp Lejeune service (1953–1987) qualifies for 8 presumptive conditions including cancers and Parkinson's disease. <strong>No nexus letter required</strong> — VA presumes service connection for covered conditions.', stat1:'No nexus letter required', stat1sub:'8 covered conditions', stat2:'38 CFR 3.309(f)', stat2sub:'Camp Lejeune', color:'#93C5FD' },
+    RADIATION: { label:'☢️ Ionizing Radiation Presumptive Pathway', body:'Your radiation exposure during service qualifies for 21 specific cancer presumptives. <strong>VA presumes service connection</strong> for covered cancers if you participated in qualifying radiation-risk activities.', stat1:'21 cancer presumptives', stat1sub:'No nexus required', stat2:'38 CFR 3.309(d)', stat2sub:'Radiation exposure', color:'#C4B5FD' },
+    MST: { label:'🛡️ Military Sexual Trauma — Liberal Evidentiary Standard', body:'MST-related conditions qualify under a <strong>liberalized evidentiary standard</strong> (38 CFR 3.304(f)(5)). VA does not require corroborating evidence of the trauma — behavioral changes, medical records, and personal statements are sufficient.', stat1:'No corroboration required', stat1sub:'Lay evidence sufficient', stat2:'38 CFR 3.304(f)(5)', stat2sub:'MST liberal standard', color:'#F9A8D4' },
+    POW: { label:'🎖️ Prisoner of War Presumptive Pathway', body:'POW veterans have a specific presumptive list under 38 CFR 3.309(c) covering mental health, cardiovascular, neurological, and GI conditions. Veterans held 30+ days receive additional cancer presumptives.', stat1:'POW presumptive list', stat1sub:'38 CFR 3.309(c)', stat2:'Veterans held 30+ days', stat2sub:'Cancer presumptive', color:'#FCD34D' },
+    COMBAT_DIRECT: { label:'⚔️ Combat Service — PTSD Liberal Standard', body:'Combat service qualifies for the PTSD liberal evidentiary standard (38 CFR 3.304(f)). VA accepts personal statement as evidence of the in-service stressor — no requirement to corroborate with official records.', stat1:'Personal statement sufficient', stat1sub:'No official record needed', stat2:'38 CFR 3.304(f)', stat2sub:'Combat PTSD standard', color:'var(--gold)' },
+    TERA_DIRECT: { label:'🔬 TERA Training Exposure — Direct Service Connection', body:'Your MOS has documented toxic training exposure. <strong>This is NOT a PACT Act presumptive claim</strong> — file as direct service connection. VA has a duty to consider your exposure (38 CFR 3.303), but you must build the evidentiary case. A specialist nexus letter is strongly recommended.', stat1:'Nexus letter recommended', stat1sub:'Direct SC required', stat2:'38 CFR 3.303', stat2sub:'TERA duty-to-assist', color:'#7DD3FC' },
+    MIXED: { label:'🔀 Multiple Pathways Identified', body:'Your service history qualifies under multiple VA pathways. Review each condition card — some conditions will be presumptive while others require direct service connection. Follow the filing sequence for maximum efficiency.', stat1:'Multiple pathways', stat1sub:'See each condition card', stat2:'Mixed strategy', stat2sub:'Follow filing order', color:'var(--gold)' },
+    DIRECT: { label:'📋 Direct Service Connection Pathway', body:'Your conditions require direct service connection — you must establish a current diagnosis, an in-service event or exposure, and a medical nexus linking the two. A private nexus letter from a treating physician is strongly recommended.', stat1:'Nexus letter recommended', stat1sub:'3-legged stool required', stat2:'38 CFR 3.303', stat2sub:'Direct service connection', color:'rgba(255,255,255,.7)' }
+  };
+  const bannerData = pathwayBanners[data.pathway] || pathwayBanners.DIRECT;
+  if (data.pathway && data.pathway !== 'DIRECT') {
+    html += `<div class="tera-pathway-banner" style="border-left-color:${bannerData.color}">
       <div class="tera-banner-left">
-        <div class="tera-banner-label">⚡ TERA / PACT Act Pathway Active</div>
-        <div class="tera-banner-body">Your MOS and exposure history qualifies under the Toxic Exposures Risk Activity (TERA) program and the PACT Act. For covered conditions, <strong>VA is legally required to obtain a medical opinion</strong> — you do not need a private nexus letter to initiate your claim. A private nexus letter remains an option to target a higher rating tier.</div>
+        <div class="tera-banner-label" style="color:${bannerData.color}">${bannerData.label}</div>
+        <div class="tera-banner-body">${bannerData.body}</div>
       </div>
       <div class="tera-banner-right">
-        <div class="tera-stat"><div class="tera-stat-val">No nexus letter required</div><div class="tera-stat-label">VA must get C&P opinion</div></div>
-        <div class="tera-stat"><div class="tera-stat-val">38 CFR 3.309(e)</div><div class="tera-stat-label">PACT Act + TERA</div></div>
+        <div class="tera-stat"><div class="tera-stat-val" style="color:${bannerData.color}">${bannerData.stat1}</div><div class="tera-stat-label">${bannerData.stat1sub}</div></div>
+        <div class="tera-stat"><div class="tera-stat-val" style="color:${bannerData.color}">${bannerData.stat2}</div><div class="tera-stat-label">${bannerData.stat2sub}</div></div>
       </div>
     </div>`;
   }
@@ -1370,6 +1530,156 @@ function toggleCondBody(hdr) {
 }
 
 // ── DASHBOARD ──
+// ── SECONDARY OPPORTUNITY SUGGESTIONS ──
+// Fires when at least one condition is in "Won" — surfaces contextual secondary claims
+// based on what the veteran has already won. Medical literature backed.
+function getSecondaryOpportunities(wonConditions) {
+  const won = wonConditions.map(c => c.name.toLowerCase());
+  const alreadyTracked = conditions.map(c => c.name.toLowerCase());
+  const suggestions = [];
+
+  const hasWon = (pattern) => won.some(n => new RegExp(pattern, 'i').test(n));
+  const notTracked = (name) => !alreadyTracked.some(n => n.includes(name.toLowerCase().slice(0, 8)));
+
+  // Sleep Apnea secondaries
+  if ((hasWon('asthma|rhinitis|sinusitis|copd|respiratory|bronch') || hasWon('ptsd|anxiety|depression|mental')) && notTracked('sleep apnea')) {
+    suggestions.push({
+      name: 'Sleep Apnea (OSA)',
+      secondaryTo: hasWon('asthma|rhinitis|respiratory') ? 'Asthma' : 'PTSD',
+      reason: hasWon('asthma|rhinitis|respiratory')
+        ? 'Upper airway inflammation from service-connected asthma/rhinitis causes obstructive sleep apnea. One of the strongest secondary relationships in VA claims.'
+        : 'Hypervigilance from service-connected PTSD disrupts sleep architecture and causes OSA. Strongly supported by medical literature.',
+      targetRating: 50,
+      icon: '😴',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Anxiety/Depression secondaries
+  if (hasWon('tinnitus') && notTracked('anxiety') && notTracked('depression')) {
+    suggestions.push({
+      name: 'Anxiety Disorder',
+      secondaryTo: 'Tinnitus',
+      reason: 'Chronic tinnitus causes psychological distress, sleep disruption, concentration difficulty, and social withdrawal — documented to cause secondary anxiety and depression.',
+      targetRating: 30,
+      icon: '🧠',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Hypertension secondary
+  if (hasWon('ptsd|anxiety') && notTracked('hypertension') && notTracked('blood pressure')) {
+    suggestions.push({
+      name: 'Hypertension',
+      secondaryTo: 'PTSD',
+      reason: 'PTSD causes chronic sympathetic nervous system activation, elevating blood pressure. Multiple peer-reviewed studies confirm this secondary relationship. Added to PACT presumptive list in 2025 for some veterans.',
+      targetRating: 10,
+      icon: '🩺',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Knee/hip secondary to back
+  if (hasWon('back|lumbar|spine|lumbosacral') && notTracked('knee')) {
+    suggestions.push({
+      name: 'Knee Condition (Bilateral)',
+      secondaryTo: 'Lumbar Spine',
+      reason: 'Altered gait and compensatory mechanics from service-connected back conditions cause secondary knee degeneration. File both knees — each is rated separately.',
+      targetRating: 10,
+      icon: '🦵',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // GERD secondary
+  if (hasWon('ptsd|anxiety|asthma') && notTracked('gerd') && notTracked('acid reflux') && notTracked('gastro')) {
+    suggestions.push({
+      name: 'GERD / Acid Reflux',
+      secondaryTo: hasWon('ptsd|anxiety') ? 'PTSD' : 'Asthma',
+      reason: hasWon('asthma') ? 'Bronchodilator medications (albuterol, corticosteroids) used for service-connected asthma cause acid reflux as a documented side effect.' : 'Stress from service-connected PTSD/anxiety directly causes gastrointestinal symptoms including GERD.',
+      targetRating: 10,
+      icon: '🔥',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Migraines secondary to tinnitus or TBI
+  if ((hasWon('tinnitus|tbi|traumatic brain') || hasWon('ptsd')) && notTracked('migraine') && notTracked('headache')) {
+    suggestions.push({
+      name: 'Migraines',
+      secondaryTo: hasWon('tbi|traumatic brain') ? 'TBI' : hasWon('tinnitus') ? 'Tinnitus' : 'PTSD',
+      reason: 'Strong medical literature links migraines to service-connected TBI, tinnitus, and PTSD. Rated based on frequency — 10% for less than once/month, up to 50% for very frequent prostrating attacks.',
+      targetRating: 30,
+      icon: '🤕',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Erectile dysfunction secondary
+  if ((hasWon('ptsd|anxiety|depression|diabetes|back|spine') ) && notTracked('erectile') && notTracked('ed ')) {
+    suggestions.push({
+      name: 'Erectile Dysfunction',
+      secondaryTo: hasWon('ptsd') ? 'PTSD' : hasWon('diabetes') ? 'Diabetes Mellitus' : 'Lumbar Spine',
+      reason: 'ED is well-supported as secondary to PTSD (psychological), diabetes (vascular/neurological), or spinal conditions (neurological). Often overlooked but rated 0% with Special Monthly Compensation (SMC-K) which adds ~$130/month.',
+      targetRating: 0,
+      icon: '⚕️',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Fibromyalgia secondary to PTSD for Gulf War / MST veterans
+  if (hasWon('ptsd') && notTracked('fibromyalgia')) {
+    suggestions.push({
+      name: 'Fibromyalgia',
+      secondaryTo: 'PTSD',
+      reason: 'Research shows 39.7% of veterans seeking PTSD treatment have fibromyalgia. The chronic stress response from PTSD is strongly associated with widespread musculoskeletal pain. Common secondary claim for MST and combat veterans.',
+      targetRating: 10,
+      icon: '💪',
+      cfr: '38 CFR 3.310'
+    });
+  }
+
+  // Return max 3 most relevant
+  return suggestions.slice(0, 3);
+}
+
+function renderSecondarySuggestions(wonConditions) {
+  const suggestions = getSecondaryOpportunities(wonConditions);
+  if (!suggestions.length) return '';
+
+  return `
+  <div class="secondary-suggest-card">
+    <div class="secondary-suggest-hdr">
+      <div class="secondary-suggest-title">💡 Secondary Claim Opportunities</div>
+      <div class="secondary-suggest-sub">Based on your service-connected conditions, these secondary claims are supported by medical literature and are commonly won at the VA.</div>
+    </div>
+    ${suggestions.map(s => `
+    <div class="secondary-suggest-item">
+      <div class="secondary-suggest-item-left">
+        <div class="ssi-icon">${s.icon}</div>
+        <div class="ssi-body">
+          <div class="ssi-name">${s.name} <span class="ssi-secondary-tag">secondary to ${s.secondaryTo}</span></div>
+          <div class="ssi-reason">${s.reason}</div>
+          <div class="ssi-meta">${s.cfr} · Target rating: ${s.targetRating}%${s.targetRating === 0 ? ' + SMC-K' : ''}</div>
+        </div>
+      </div>
+      <div class="ssi-actions">
+        <button class="btn btn-outline btn-sm" onclick="askAyleneAboutSecondary('${s.name.replace(/'/g,"\'")}','${s.secondaryTo.replace(/'/g,"\'")}')">Ask Aylene</button>
+      </div>
+    </div>`).join('')}
+    <div class="secondary-suggest-footer">These are educational suggestions only. Consult an accredited VSO or VA attorney before filing. <button class="btn-link-inline" onclick="showPage('regulations')">Learn about secondary service connection →</button></div>
+  </div>`;
+}
+
+function askAyleneAboutSecondary(condName, secondaryTo) {
+  showPage('chat');
+  if (chatHistory.length === 0) initChat();
+  setTimeout(() => {
+    document.getElementById('chatInput').value = `I have service-connected ${secondaryTo}. Can you help me build a secondary service connection claim for ${condName}? What evidence do I need and what's the strongest way to file?`;
+    sendMessage();
+  }, 600);
+}
+
 function renderDashboard() {
   const el = document.getElementById('dashContent');
   if (!el) return;
@@ -1465,7 +1775,8 @@ function renderDashboard() {
         ${renderKanbanCol('won','✅ Won','green')}
       </div>
     </div>
-  </div>`;
+  </div>
+  ${wonConds.length ? renderSecondarySuggestions(wonConds) : ''}`;
 
   el.innerHTML = html;
 }
@@ -1603,13 +1914,14 @@ function toggleCheck(condId, checkIdx) {
 }
 
 function printRoadmap() {
-  if (!roadmapData || !conditions.length) { alert('Complete your screener first to generate a roadmap to print.'); return; }
+  const printConds = conditions.length ? conditions : (roadmapData?.conditions?.map((c,i) => ({...c, id:'p-'+i, secondaryTo:c.secondaryTo||'', targetRating:c.targetRating||0, ratingCriteria: typeof getRatingCriteria==='function' ? getRatingCriteria(c.name) : []})) || []);
+  if (!roadmapData || !printConds.length) { alert('Complete your screener first to generate a roadmap to print.'); return; }
   const branch = ans.branch?.[0] || 'Veteran';
   const mos = ans.mos?.code ? `${ans.mos.code} — ${ans.mos.title||ans.mos.label||''}` : '';
   const typeLabels = { direct:'Direct Service', secondary:'Secondary', presumptive:'Presumptive / PACT Act', lay:'Lay Evidence' };
   const pathwayLabels = { TERA_PACT:'TERA / PACT Act', DIRECT:'Direct Service Connection', SECONDARY:'Secondary Service Connection', MIXED:'Multiple Pathways' };
 
-  const condHTML = conditions.map((c, i) => `
+  const condHTML = printConds.map((c, i) => `
     <div style="border:1px solid #ccc;border-radius:6px;padding:16px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         ${c.filing_order ? `<span style="font-size:11px;background:#F1F5F9;color:#334155;padding:2px 8px;border-radius:3px;font-weight:700">File #${c.filing_order}</span>` : ''}
@@ -2421,7 +2733,7 @@ function renderCPPrep() {
     el.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:10px">🎯</div>Complete your screener to generate your personalized C&P prep guide.</div>';
     return;
   }
-  const hasTera = roadmapData?.pathway === 'TERA_PACT';
+  const hasTera = roadmapData?.pathway === 'PACT_ACT' || roadmapData?.pathway === 'MIXED';
   let html = '';
   if (hasTera) {
     html += `<div class="alert alert-amber" style="margin-bottom:20px"><span>⚡</span><span><strong>TERA/PACT Act Note:</strong> Because your claim falls under the PACT Act, VA is required to schedule your C&P exam. You don't need to prove causation — your job at the exam is to accurately describe the severity of your symptoms so the examiner assigns the correct rating tier.</span></div>`;
