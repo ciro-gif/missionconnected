@@ -1300,3 +1300,95 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   color: rgba(255,255,255,.6);
   white-space: nowrap;
 }
+
+/* ── SECONDARY CLAIM SUGGESTIONS ── */
+.secondary-suggest-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid #C9A84C;
+  border-radius: 10px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+.secondary-suggest-hdr {
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid var(--border);
+  background: #FFFBEB;
+}
+.secondary-suggest-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 3px;
+}
+.secondary-suggest-sub {
+  font-size: 12px;
+  color: var(--text-sec);
+  line-height: 1.5;
+}
+.secondary-suggest-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #F1F5F9;
+}
+.secondary-suggest-item:last-of-type { border-bottom: none; }
+.secondary-suggest-item-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+.ssi-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ssi-body { flex: 1; min-width: 0; }
+.ssi-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ssi-secondary-tag {
+  font-size: 10px;
+  font-weight: 600;
+  background: #EFF6FF;
+  color: var(--sky);
+  padding: 1px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.ssi-reason {
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.ssi-meta {
+  font-size: 11px;
+  color: var(--text-hint);
+  font-weight: 500;
+}
+.ssi-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.secondary-suggest-footer {
+  padding: 10px 18px;
+  font-size: 11px;
+  color: var(--text-hint);
+  background: #FAFBFC;
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
