@@ -1157,5 +1157,35 @@
 
 <script src="data.js"></script>
 <script src="app.js"></script>
+<!-- FLOATING AYLENE BUBBLE -->
+<div id="ayleneFloat" class="aylene-float" style="display:none">
+  <div class="aylene-float-bubble" id="ayleneFloatBubble" onclick="toggleAyleneFloat()">
+    <div class="aylene-float-avatar" id="ayleneFloatAvatar"></div>
+    <div class="aylene-float-badge" id="ayleneFloatBadge" style="display:none">1</div>
+  </div>
+  <div class="aylene-float-panel" id="ayleneFloatPanel">
+    <div class="aylene-float-hdr">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="aylene-float-avatar-sm" id="ayleneFloatAvatarSm"></div>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#fff">Aylene</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7)">VA Claims Advisor · Online</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="aylene-float-expand" onclick="showPage('chat');closeAyleneFloat()" title="Open full chat">⤢</button>
+        <button class="aylene-float-close" onclick="closeAyleneFloat()">✕</button>
+      </div>
+    </div>
+    <div class="aylene-float-msgs" id="ayleneFloatMsgs"></div>
+    <div class="aylene-float-input-row">
+      <textarea class="aylene-float-input" id="ayleneFloatInput" placeholder="Ask Aylene..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendFloatMessage()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+      <button class="aylene-float-send" onclick="sendFloatMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
