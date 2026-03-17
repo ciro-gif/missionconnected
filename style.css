@@ -1560,3 +1560,12 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   transition: background .12s;
 }
 .aylene-float-send:hover { background: var(--sky); }
+
+/* ── RATING CRITERIA CTA ── */
+.rating-criteria-cta {
+  display: flex;
+  align-items: center;
+  padding: 10px 0 4px;
+  border-top: 1px solid #F1F5F9;
+  margin-top: 8px;
+}
