@@ -1237,33 +1237,23 @@ In-Service Events: ${ans.events?.join(', ')||'None'}
 LEGAL PATHWAY ANALYSIS (apply strictly — each section below is based on this veteran's specific profile):
 ${pathwayContext}
 
-STRATEGIC SECONDARY RELATIONSHIPS (always check BEFORE assigning type:direct):
-- Sleep Apnea secondary to PTSD (hypervigilance/medication weight gain) OR secondary to Asthma/Rhinitis (airway inflammation) — stronger than direct
-- Depression secondary to chronic pain, tinnitus, or any SC physical condition — well-supported
-- Hypertension secondary to PTSD (sympathetic activation) or secondary to OSA — file this way if PTSD/OSA is SC
-- GERD/IBS secondary to PTSD or anxiety — stress-related GI is well-documented
-- Knee/hip secondary to SC back (altered gait) — cascade claims
-- Migraines secondary to TBI or PTSD — strong literature
-- Radiculopathy secondary to SC spinal condition — always secondary if spine is SC
-- Erectile dysfunction secondary to PTSD, diabetes, or spinal — stronger as secondary
-RULE: If a secondary pathway exists, it is usually strategically superior. Assign anchor filing_order:1, secondary filing_order:2+.
+SECONDARY OPPORTUNITIES (check before assigning type:direct):
+Sleep apnea→secondary to asthma/rhinitis or PTSD. Depression/anxiety→secondary to tinnitus/chronic pain. Hypertension→secondary to PTSD or OSA. GERD→secondary to PTSD/asthma meds. Knee/hip→secondary to SC back. Migraines→secondary to TBI/PTSD. ED→secondary to PTSD/diabetes/spine. If secondary pathway exists, it is strategically superior. Anchor=filing_order:1, secondary=filing_order:2+.
 
 RULES:
-- Generate 2-4 winnable, specific conditions based on this veteran's unique profile — not generic conditions
-- Prioritize presumptive conditions first (easiest to win), then strong direct SC, then secondary
-- Before type:direct, check secondary relationships above
-- options: 2-3 real decision points (e.g. "File now with VA C&P only" vs "Get private nexus letter first for higher rating")
-- For PACT presumptive: options MUST include "File now — VA required to schedule C&P, no nexus letter needed" AND "Optionally get private IMO to target higher rating tier"
-- For TERA direct: options MUST note "nexus letter strongly recommended" vs "file without one and risk lower rating"
-- targetRating: CPAP=50, daily bronchodilator=30, tinnitus=10, mild-moderate PTSD/anxiety=30-50, severe PTSD=70, hearing loss=0-100 per audiogram, hypertension=10-60, diabetes=10-20 controlled
-- pathway field must accurately reflect the veteran's situation: PACT_ACT | TERA_DIRECT | AGENT_ORANGE | GULF_WAR | CAMP_LEJEUNE | RADIATION | MST | POW | COMBAT_DIRECT | DIRECT | MIXED
+- 2-4 winnable conditions specific to this veteran's profile
+- options: 2 short decision points (e.g. "File now" vs "Get nexus letter first")
+- targetRating: CPAP=50, bronchodilator=30, tinnitus=10, PTSD mild=30 moderate=50 severe=70, hypertension=10-60
+- checks: 3 brief action items only
+- pathway: PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED
+- Keep ALL text fields SHORT — nexus 1 sentence, evidence_have brief, evidence_need brief, action 1 sentence
 
 RETURN THIS JSON STRUCTURE (minified):
 {"summary":"2-3 sentences on legal position and overall strategy","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for presumptive: note VA duty; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
 MINIFIED JSON ONLY.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 2000);
+    const data = await callClaude([{role:'user',content:prompt}], 2500);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -3211,17 +3201,31 @@ function showC101(idx) {
   cards.forEach((c, i) => c.classList.toggle('active', i === idx));
   dots.forEach((d, i) => d.classList.toggle('active', i === idx));
   _c101Current = idx;
+  // Reset progress bar on card change
+  const bar = document.getElementById('c101ProgressFill');
+  if (bar) bar.style.width = '0%';
 }
 
 function startC101Carousel() {
   _c101Current = 0;
   showC101(0);
   clearInterval(_c101Timer);
+  const CARD_DURATION = 7000; // 7 seconds per card
+  let _c101Elapsed = 0;
+  const TICK = 50;
   _c101Timer = setInterval(() => {
-    const total = document.querySelectorAll('.c101-card').length;
-    _c101Current = (_c101Current + 1) % total;
-    showC101(_c101Current);
-  }, 3000);
+    _c101Elapsed += TICK;
+    // Update progress bar
+    const pct = (_c101Elapsed / CARD_DURATION) * 100;
+    const bar = document.getElementById('c101ProgressFill');
+    if (bar) bar.style.width = Math.min(pct, 100) + '%';
+    if (_c101Elapsed >= CARD_DURATION) {
+      _c101Elapsed = 0;
+      const total = document.querySelectorAll('.c101-card').length;
+      _c101Current = (_c101Current + 1) % total;
+      showC101(_c101Current);
+    }
+  }, TICK);
 }
 
 function stopC101Carousel() {
