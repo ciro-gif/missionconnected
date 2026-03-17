@@ -562,13 +562,52 @@
       <div class="loading-wrap">
         <div class="loading-ring"></div>
         <div class="loading-title">Building Your Roadmap</div>
-        <div style="font-size:14px;color:var(--text-sec);margin-bottom:28px;line-height:1.7">Analyzing your service history, MOS, exposures,<br>and symptoms to build your personalized blueprint.</div>
-        <div id="ls1" class="loading-step active">🔍 Reviewing service history and MOS...</div>
-        <div id="ls2" class="loading-step">📋 Identifying ratable conditions...</div>
-        <div id="ls3" class="loading-step">⚗️ Checking PACT Act presumptive coverage...</div>
-        <div id="ls4" class="loading-step">🔗 Finding secondary condition opportunities...</div>
-        <div id="ls5" class="loading-step">📊 Applying VA rating criteria...</div>
-        <div id="ls6" class="loading-step">🗺️ Building your action plan...</div>
+        <div style="font-size:13px;color:var(--text-sec);margin-bottom:20px">Analyzing your service history and symptoms…</div>
+        <!-- Hidden steps for JS timing (still used) -->
+        <div id="ls1" style="display:none"></div><div id="ls2" style="display:none"></div>
+        <div id="ls3" style="display:none"></div><div id="ls4" style="display:none"></div>
+        <div id="ls5" style="display:none"></div><div id="ls6" style="display:none"></div>
+        <!-- VA Claims 101 Educational Cards -->
+        <div class="claims-101-carousel" id="claims101">
+          <div class="c101-card active" id="c101-0">
+            <div class="c101-icon">⚖️</div>
+            <div class="c101-title">Service Connection — The 3 Elements</div>
+            <div class="c101-body">Every VA disability claim requires three things: <strong>(1)</strong> a current diagnosis, <strong>(2)</strong> an in-service event or exposure, and <strong>(3)</strong> a medical nexus linking the two. Miss any one and VA can deny. Your roadmap will show you exactly what each condition needs.</div>
+          </div>
+          <div class="c101-card" id="c101-1">
+            <div class="c101-icon">🔗</div>
+            <div class="c101-title">Secondary Service Connection</div>
+            <div class="c101-body">Once you win a primary claim, new conditions caused <em>or worsened</em> by that rated condition can be filed as <strong>secondary</strong>. For example: sleep apnea secondary to asthma, or hypertension secondary to PTSD. Burden of proof is lower — the anchor condition does the legal work.</div>
+          </div>
+          <div class="c101-card" id="c101-2">
+            <div class="c101-icon">⚡</div>
+            <div class="c101-title">PACT Act (2022)</div>
+            <div class="c101-body">The PACT Act expanded VA benefits for veterans exposed to burn pits, Agent Orange, radiation, and other toxic hazards. For <strong>covered conditions</strong>, VA presumes service connection — meaning you don't need to prove causation. VA must schedule a C&P exam at no cost to you.</div>
+          </div>
+          <div class="c101-card" id="c101-3">
+            <div class="c101-icon">🔬</div>
+            <div class="c101-title">TERA — Toxic Exposure Risk Activity</div>
+            <div class="c101-body">TERA is a VA program recognizing toxic training exposures — like chemical agents used in CBRN training. It's <strong>not</strong> the same as PACT Act presumptives. Under TERA, VA has a duty to consider your documented exposure when evaluating your claim. A specialist nexus letter strengthens TERA-based claims significantly.</div>
+          </div>
+          <div class="c101-card" id="c101-4">
+            <div class="c101-icon">📋</div>
+            <div class="c101-title">Intent to File — Protect Your Date</div>
+            <div class="c101-body">Filing an <strong>Intent to File (ITF)</strong> costs nothing and locks your effective date — the date VA starts calculating back pay. Do it immediately, even before you have all your evidence. You have 12 months to submit your full claim. Every day you wait could mean lost retroactive pay.</div>
+          </div>
+          <div class="c101-card" id="c101-5">
+            <div class="c101-icon">🩺</div>
+            <div class="c101-title">The C&P Exam — Your Most Important Day</div>
+            <div class="c101-body">The Compensation &amp; Pension exam is where VA examiners evaluate your symptoms. <strong>Describe your worst days</strong> — not your average days. The rating schedule is based on severity. If you minimize your symptoms that day, your rating reflects it permanently. You're not exaggerating — you're being accurate.</div>
+          </div>
+        </div>
+        <div class="c101-dots" id="c101Dots">
+          <span class="c101-dot active" onclick="showC101(0)"></span>
+          <span class="c101-dot" onclick="showC101(1)"></span>
+          <span class="c101-dot" onclick="showC101(2)"></span>
+          <span class="c101-dot" onclick="showC101(3)"></span>
+          <span class="c101-dot" onclick="showC101(4)"></span>
+          <span class="c101-dot" onclick="showC101(5)"></span>
+        </div>
       </div>
     </div>
 
