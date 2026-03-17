@@ -404,6 +404,7 @@ function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
   currentView = id;
+  if (id === 'vApp') showAyleneFloat();
   // When going to vApp, default to roadmap (not dashboard) unless we have one
   if (id === 'vApp' && currentPage === 'dashboard' && !roadmapData) {
     showPage('roadmap');
@@ -423,7 +424,7 @@ function showPage(id) {
   if (id === 'activity') renderActivityLog();
   if (id === 'profile') renderProfile();
   if (id === 'records') { updateRecordsStorageBanner(); }
-  if (id === 'notes') { loadNotes(); }
+  if (id === 'notes') { requestAnimationFrame(() => { loadNotes(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }); }
   if (id === 'cpprep') { renderCPPrep(); }
   if (id === 'deadlines') { renderDeadlines(); }
   if (id === 'buddy') { updateBuddyPlaceholders(); }
@@ -1408,6 +1409,7 @@ function renderCondCard(c, typeColors, typeLabels) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px">
           <span class="cond-pri-badge badge-${c.type}">${label}</span>
           ${c.filing_order ? `<span style="font-size:10px;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 6px;font-weight:600">File #${c.filing_order}</span>` : ''}
+          ${c.targetRating ? `<span style="font-size:10px;background:#C9A84C;color:#002855;border-radius:4px;padding:1px 7px;font-weight:700">Target ${c.targetRating}%</span>` : ''}
           ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec)">↳ Secondary to ${c.secondaryTo}</span>` : ''}
           ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint)">${c.cfr}</span>` : ''}
           ${dc ? `<span class="cond-dc-badge">DC ${dc.code}</span>` : ''}
@@ -1518,7 +1520,7 @@ function getCPTips(name) {
     ],
   };
   for (const key in tips) { if (n.includes(key)) return tips[key]; }
-  return null;
+  return [];
 }
 
 function toggleCondBody(hdr) {
@@ -2203,15 +2205,18 @@ RECORDS STORAGE NOTE:
 - With account: Files upload to encrypted Supabase Storage (private bucket, per-user folder)
 - Uploaded records are NEVER shared with anyone without explicit veteran authorization
 
-COMMUNICATION STYLE:
-- Conversational, never clinical or robotic
-- Use first-person and address the veteran directly
-- Short-to-medium responses unless detail is truly needed
-- Cite 38 CFR when helpful but explain in plain language
-- Reference the app navigation when it would help them take action
-- Never estimate someone's specific rating — show criteria, let them interpret
-- Never give legal advice or represent yourself as a lawyer
-- Never discuss anything unrelated to veterans benefits`;
+COMMUNICATION STYLE — THIS IS CRITICAL:
+- You are texting a veteran, not writing a report. Keep responses SHORT — 2 to 5 sentences max unless they explicitly ask for detail.
+- NEVER use bullet points, numbered lists, bold headers, or emoji sections. Just talk.
+- Write like a knowledgeable friend texting: direct, warm, no fluff.
+- One idea per message. If there's more to say, ask a follow-up question instead.
+- If you want to emphasize something, just say it plainly — don't bold it or put it in a list.
+- Match the veteran's energy. If they send one sentence, send one or two back.
+- Cite 38 CFR only when it genuinely helps — and only inline, never as a header.
+- Never estimate a specific rating. Show criteria briefly if asked.
+- Never give legal advice or say you're a lawyer.
+- Only discuss veterans benefits. If asked about anything else, redirect warmly.
+- Do NOT mention PACT Act or deployments unless the veteran's profile shows qualifying overseas service. A CONUS-only veteran's claim is direct service connection, not PACT.`;
 
 
 const AYLENE_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" style="width:100%;height:100%">
@@ -2313,7 +2318,16 @@ async function sendMessage() {
   showTyping();
 
   const context = roadmapData
-    ? `\nVeteran context: Branch ${ans.branch?.join(',')}, MOS ${ans.mos?.code||'?'} ${ans.mos?.title||''}, Conditions: ${conditions.map(c=>c.name).join(', ')}`
+    ? `\nVETERAN PROFILE (use this to personalize every response):` +
+      `\n- Branch: ${ans.branch?.join('/') || 'Unknown'}, Component: ${ans.component || 'Unknown'}` +
+      `\n- MOS: ${ans.mos?.code || '?'} ${ans.mos?.title || ans.mos?.label || ''}` +
+      `\n- Service: ${ans.startYear || '?'}–${ans.endYear || 'Present'}, Discharge: ${ans.discharge || 'Unknown'}` +
+      `\n- Deployments: ${ans.deployments?.join(', ') || 'None listed'}` +
+      `\n- Exposures: ${ans.exposures?.join(', ') || 'None listed'}` +
+      `\n- Legal pathway: ${roadmapData?.pathway || 'DIRECT'}` +
+      `\n- Conditions in roadmap: ${(roadmapData?.conditions || conditions).map(c => c.name + (c.type === 'presumptive' ? ' (presumptive)' : c.type === 'secondary' ? ' (secondary to ' + (c.secondaryTo || '?') + ')' : ' (direct)')).join(', ')}` +
+      `\n- Current VA status: ${ans.vaStatus || 'none'}, Prior ratings: ${ans.ratedConds?.join(', ') || 'none'}` +
+      `\nIMPORTANT: Only mention PACT Act / presumptive if the pathway above says PACT_ACT. This veteran has ${ans.deployments?.some(d => /gulf|iraq|afghanistan|oif|oef|vietnam|swa/i.test(d)) ? 'qualifying overseas service' : 'CONUS service only — do NOT suggest PACT Act or presumptive pathways'}.`
     : '';
   const notesCtx = buildNotesContext();
 
@@ -3044,6 +3058,111 @@ function renderTimeline() {
   });
   html += '</div>';
   el.innerHTML = html;
+}
+
+// ── FLOATING AYLENE BUBBLE ──
+let floatOpen = false;
+let floatHistory = [];
+
+function showAyleneFloat() {
+  const el = document.getElementById('ayleneFloat');
+  if (el) {
+    el.style.display = 'block';
+    // Render Aylene avatar in bubble
+    const av = document.getElementById('ayleneFloatAvatar');
+    const avSm = document.getElementById('ayleneFloatAvatarSm');
+    if (av) av.innerHTML = AYLENE_AVATAR_SVG;
+    if (avSm) avSm.innerHTML = AYLENE_AVATAR_SVG;
+    // Init with greeting if no history
+    if (!floatHistory.length) {
+      const greeting = roadmapData
+        ? `Hey — I can see your roadmap. What do you want to dig into?`
+        : `Hey! I'm Aylene. Ask me anything about your VA claim.`;
+      appendFloatMsg('ai', greeting);
+      floatHistory.push({ role: 'assistant', content: greeting });
+    }
+  }
+}
+
+function toggleAyleneFloat() {
+  const panel = document.getElementById('ayleneFloatPanel');
+  if (!panel) return;
+  floatOpen = !floatOpen;
+  panel.style.display = floatOpen ? 'flex' : 'none';
+  if (floatOpen) {
+    document.getElementById('ayleneFloatBadge').style.display = 'none';
+    setTimeout(() => document.getElementById('ayleneFloatInput')?.focus(), 100);
+    scrollFloatToBottom();
+  }
+}
+
+function closeAyleneFloat() {
+  floatOpen = false;
+  const panel = document.getElementById('ayleneFloatPanel');
+  if (panel) panel.style.display = 'none';
+}
+
+function appendFloatMsg(role, text) {
+  const msgs = document.getElementById('ayleneFloatMsgs');
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'float-msg float-msg-user' : 'float-msg float-msg-ai';
+  div.innerHTML = text.replace(/\n/g, '<br>');
+  msgs.appendChild(div);
+  scrollFloatToBottom();
+  // Show badge if panel closed
+  if (!floatOpen && role === 'ai') {
+    const badge = document.getElementById('ayleneFloatBadge');
+    if (badge) badge.style.display = 'flex';
+  }
+}
+
+function scrollFloatToBottom() {
+  const msgs = document.getElementById('ayleneFloatMsgs');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendFloatMessage() {
+  const input = document.getElementById('ayleneFloatInput');
+  const text = input?.value?.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  appendFloatMsg('user', text);
+  floatHistory.push({ role: 'user', content: text });
+
+  // Typing indicator
+  const typingId = 'float-typing-' + Date.now();
+  const msgs = document.getElementById('ayleneFloatMsgs');
+  if (msgs) {
+    const t = document.createElement('div');
+    t.className = 'float-msg float-msg-ai float-typing';
+    t.id = typingId;
+    t.innerHTML = '<span></span><span></span><span></span>';
+    msgs.appendChild(t);
+    scrollFloatToBottom();
+  }
+
+  const context = roadmapData
+    ? `
+VETERAN PROFILE:
+- Branch: ${ans.branch?.join('/') || 'Unknown'}, MOS: ${ans.mos?.code || '?'} ${ans.mos?.label || ''}
+- Deployments: ${ans.deployments?.join(', ') || 'None'}
+- Pathway: ${roadmapData?.pathway || 'DIRECT'}
+- Conditions: ${(roadmapData?.conditions || conditions).map(c => c.name).join(', ')}
+${ans.deployments?.some(d => /gulf|iraq|afghanistan|oif|oef|vietnam|swa/i.test(d)) ? '' : 'CONUS only — do NOT mention PACT Act.'}`
+    : '';
+
+  try {
+    const data = await callClaude([...floatHistory.slice(-6)], 300, AYLENE_SYSTEM + context);
+    document.getElementById(typingId)?.remove();
+    const reply = data.content?.[0]?.text || "Having trouble right now, try again.";
+    appendFloatMsg('ai', reply);
+    floatHistory.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    document.getElementById(typingId)?.remove();
+    appendFloatMsg('ai', "Connection issue — try again in a moment.");
+  }
 }
 
 // ── CLAUDE API ──
