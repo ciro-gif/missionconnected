@@ -515,18 +515,44 @@ function removeRatingRow(btn) {
 
 // Local VA rating criteria lookup (saves ~300 tokens per roadmap call)
 const RATING_CRITERIA = {
-  'ptsd':          [{pct:10,desc:'Occupational/social impairment due to mild or transient symptoms'},{pct:30,desc:'Occupational/social impairment with occasional decrease in work efficiency'},{pct:50,desc:'Reduced reliability and productivity; panic attacks more than once a week'},{pct:70,desc:'Occupational/social impairment with deficiencies in most areas'},{pct:100,desc:'Total occupational/social impairment'}],
-  'tinnitus':      [{pct:10,desc:'Tinnitus, recurrent — 10% is the max rating regardless of severity'}],
-  'hearing loss':  [{pct:0,desc:'0-100% based on pure tone average and speech discrimination scores from audiogram'}],
-  'asthma':        [{pct:10,desc:'FEV-1 of 71-80% or daily inhalational/oral bronchodilator therapy'},{pct:30,desc:'FEV-1 of 56-70% or daily inhalational/oral bronchodilator therapy with systemic corticosteroids'},{pct:60,desc:'FEV-1 less than 40% or more than one attack per week with episodes of respiratory failure'}],
-  'sleep apnea':   [{pct:0,desc:'Asymptomatic with documented sleep disorder breathing'},{pct:30,desc:'Persistent daytime hypersomnolence'},{pct:50,desc:'Requires use of breathing assistance device such as CPAP machine'},{pct:100,desc:'Chronic respiratory failure requiring tracheostomy'}],
-  'lumbar':        [{pct:10,desc:'Flexion limited to 60°, or painful motion'},{pct:20,desc:'Flexion limited to 40°'},{pct:40,desc:'Flexion limited to 30°'},{pct:50,desc:'Unfavorable ankylosis of the entire thoracolumbar spine'}],
-  'knee':          [{pct:10,desc:'Slight recurrent subluxation, painful motion'},{pct:20,desc:'Moderate disability — recurrent subluxation or lateral instability'},{pct:30,desc:'Severe instability with daily use of knee brace required'}],
-  'anxiety':       [{pct:10,desc:'Mild symptoms, no significant occupational impairment'},{pct:30,desc:'Occupational/social impairment with occasional decreases in work efficiency'},{pct:50,desc:'Reduced reliability and productivity'},{pct:70,desc:'Deficiencies in most areas of work, school, family relations'}],
-  'migraines':     [{pct:10,desc:'Characteristic prostrating attacks 1x/month or less'},{pct:30,desc:'Prostrating attacks occurring once monthly on average'},{pct:50,desc:'Very frequent completely prostrating and prolonged attacks productive of severe economic inadaptability'}],
-  'hypertension':  [{pct:10,desc:'Diastolic 100-109 or systolic 160-199'},{pct:20,desc:'Diastolic 110-119 or systolic 200+; or minimum evaluation with history of diastolic 110+'}],
-  'diabetes':      [{pct:10,desc:'Manageable by restricted diet only'},{pct:20,desc:'Requires insulin, restricted diet, or oral hypoglycemic agent'},{pct:40,desc:'Requires insulin and restricted diet, or oral hypoglycemic agent and restricted diet, with episodes of ketoacidosis'}],
-  'default':       [{pct:10,desc:'Mild — minimal symptoms with little functional impairment'},{pct:30,desc:'Moderate — occasional symptoms affecting occupational/social function'},{pct:50,desc:'Moderately severe — significant impact on daily and occupational function'},{pct:70,desc:'Severe — frequent and debilitating symptoms'}]
+  // Mental Health (DC 9411 PTSD, DC 9400 GAD, DC 9434 MDD — all use same general schedule)
+  'ptsd':             [{pct:10,desc:'Mild/transient symptoms; occupational and social functioning generally satisfactory'},{pct:30,desc:'Occasional decrease in work efficiency; some difficulty with occupational and social tasks under stress'},{pct:50,desc:'Reduced reliability and productivity; panic attacks more than once a week; difficulty understanding complex commands'},{pct:70,desc:'Deficiencies in most areas: work, school, family, judgment, thinking, mood; persistent danger of hurting self/others'},{pct:100,desc:'Total occupational and social impairment; persistent delusions or hallucinations; danger of hurting self/others'}],
+  'anxiety':          [{pct:10,desc:'Mild symptoms; occupational and social functioning generally satisfactory'},{pct:30,desc:'Occasional decreases in work efficiency; difficulty with occupational/social tasks under stress'},{pct:50,desc:'Reduced reliability and productivity; panic attacks more than once a week'},{pct:70,desc:'Deficiencies in most areas of work, school, family, judgment, thinking, mood'},{pct:100,desc:'Total occupational and social impairment'}],
+  'depression':       [{pct:10,desc:'Mild symptoms; occupational and social functioning generally satisfactory'},{pct:30,desc:'Occasional decreases in work efficiency under stress'},{pct:50,desc:'Reduced reliability and productivity; difficulty maintaining relationships'},{pct:70,desc:'Deficiencies in most areas: work, family, judgment, mood'},{pct:100,desc:'Total occupational and social impairment'}],
+  'mst':              [{pct:10,desc:'Mild symptoms; occupational and social functioning generally satisfactory'},{pct:30,desc:'Occasional decreases in work efficiency; difficulty with social tasks'},{pct:50,desc:'Reduced reliability and productivity; panic attacks more than once a week'},{pct:70,desc:'Deficiencies in most areas including judgment, thinking, mood'},{pct:100,desc:'Total occupational and social impairment'}],
+  // Respiratory (DC 6602 Asthma, DC 6847 OSA, DC 6604 COPD)
+  'asthma':           [{pct:10,desc:'FEV-1 71-80% predicted, OR daily inhalational/oral bronchodilator therapy OR; intermittent inhalational or oral bronchodilator therapy'},{pct:30,desc:'FEV-1 56-70% predicted, OR daily inhalational/oral bronchodilator therapy AND systemic corticosteroids at least monthly'},{pct:60,desc:'FEV-1 40-55% predicted, OR more than one attack per week OR; daily use of systemic (oral or parenteral) corticosteroids'},{pct:100,desc:'FEV-1 less than 40% predicted, OR FEV-1/FVC less than 40%, OR more frequent than weekly attacks, OR use of systemic corticosteroids'}],
+  'sleep apnea':      [{pct:0,desc:'Asymptomatic but with documented sleep disorder breathing'},{pct:30,desc:'Persistent daytime hypersomnolence (excessive daytime sleepiness)'},{pct:50,desc:'Requires use of a breathing assistance device (CPAP, BiPAP, oral appliance)'},{pct:100,desc:'Chronic respiratory failure with carbon dioxide retention, or cor pulmonale, or requires tracheostomy'}],
+  'copd':             [{pct:10,desc:'FEV-1 71-80% predicted or FEV-1/FVC 70-79%'},{pct:30,desc:'FEV-1 56-70% predicted or FEV-1/FVC 60-69%'},{pct:60,desc:'FEV-1 40-55% predicted or FEV-1/FVC 40-59%'},{pct:100,desc:'FEV-1 less than 40% predicted or FEV-1/FVC less than 40%'}],
+  'sinusitis':        [{pct:10,desc:'1-2 incapacitating episodes per year, OR up to 6 non-incapacitating episodes per year'},{pct:30,desc:'3 or more incapacitating episodes per year, OR constant sinusitis with headache, pain, purulent discharge or crusting'}],
+  'rhinitis':         [{pct:0,desc:'Allergic rhinitis with polyps if not covered by higher rating for sinusitis'},{pct:10,desc:'Without polyps; with polyps is rated 30% minimum'}],
+  // Musculoskeletal
+  'lumbar':           [{pct:10,desc:'Flexion limited to 60°, or characteristic pain on motion'},{pct:20,desc:'Flexion limited to 40°, or combined range of motion limited to 120°'},{pct:40,desc:'Flexion limited to 30°'},{pct:50,desc:'Flexion limited to 30° with muscle spasm on extreme forward bending'},{pct:100,desc:'Unfavorable ankylosis of the entire thoracolumbar spine'}],
+  'cervical':         [{pct:10,desc:'Forward flexion to 30-45°, or combined ROM 170-335°'},{pct:20,desc:'Forward flexion 15-30°, or combined ROM 100-170°'},{pct:30,desc:'Forward flexion to 15° or less, or combined ROM under 100°'},{pct:40,desc:'Unfavorable ankylosis in mild degree'}],
+  'knee':             [{pct:10,desc:'Slight recurrent subluxation or lateral instability, painful motion, or slight instability'},{pct:20,desc:'Moderate recurring subluxation or lateral instability; pain on motion'},{pct:30,desc:'Severe recurrent subluxation or lateral instability daily; knee brace required'}],
+  'shoulder':         [{pct:10,desc:'Forward flexion to 91-170°, or abduction to 91-170°'},{pct:20,desc:'Forward flexion to 61-90°, or abduction to 61-90°'},{pct:30,desc:'Forward flexion to 31-60°, or abduction to 31-60°'},{pct:40,desc:'Forward flexion to 30° or less, or complete ankylosis in favorable position'}],
+  'hip':              [{pct:10,desc:'Flexion limited to 0-30° or extension limited, abduction limited to 10°'},{pct:20,desc:'Flexion limited to less than 30° or abduction limited to 0-10°'},{pct:40,desc:'Intermediate degrees of unfavorable ankylosis'}],
+  'ankle':            [{pct:10,desc:'Dorsiflexion limited to less than 30°, or plantar flexion limited to less than 30°'},{pct:20,desc:'Marked limited motion of ankle'}],
+  'flat foot':        [{pct:10,desc:'Unilateral — marked, with pain on use, accentuated on prolonged standing'},{pct:20,desc:'Bilateral — marked, with pain on use, accentuated on prolonged standing'}],
+  // Neurological
+  'tinnitus':         [{pct:10,desc:'Tinnitus, recurrent. Note: 10% is the maximum single bilateral rating regardless of severity (DC 6260). File both ears together — only one 10% rating is assigned.'}],
+  'hearing loss':     [{pct:0,desc:'0% to 100% based on audiogram results — pure tone average and speech discrimination score. Rating is determined from a VA grid table combining both values. VA must administer the audiogram; a private one can be submitted too.'}],
+  'migraines':        [{pct:0,desc:'Less frequent attacks'},{pct:10,desc:'Characteristic prostrating attacks averaging 1 per month over last several months'},{pct:30,desc:'Characteristic prostrating attacks occurring on average once a month over the last several months'},{pct:50,desc:'Very frequent completely prostrating and prolonged attacks productive of severe economic inadaptability'}],
+  'peripheral neuropathy': [{pct:10,desc:'Mild; paresthesias only, no motor involvement'},{pct:20,desc:'Moderate; paresthesias interfering with daily activity, slight muscle wasting'},{pct:40,desc:'Moderately severe; incomplete paralysis, muscle atrophy'},{pct:60,desc:'Severe; complete or nearly complete paralysis'}],
+  'tbi':              [{pct:10,desc:'Cognitive impairment; mild memory loss, occasional forgetfulness'},{pct:40,desc:'Moderate; pronounced impairment affecting most complex daily activities'},{pct:70,desc:'Moderately severe; impairment in several cognitive domains'},{pct:100,desc:'Severe; total occupational and social impairment'}],
+  // Cardiovascular
+  'hypertension':     [{pct:10,desc:'Diastolic 100-109 mm/Hg, OR systolic 160-199 mm/Hg (or minimum evaluation if on continuous medication)'},{pct:20,desc:'Diastolic 110-119 mm/Hg, OR systolic 200+ mm/Hg'},{pct:40,desc:'Diastolic 120+ mm/Hg'},{pct:60,desc:'Diastolic 130+ mm/Hg'}],
+  'ischemic heart':   [{pct:10,desc:'Workload greater than 7 METs but no more than 10 METs results in dyspnea, fatigue, angina; OR continuous medication required'},{pct:30,desc:'Workload greater than 5 METs but no more than 7 METs results in dyspnea'},{pct:60,desc:'More than one episode of acute congestive heart failure in the past year; OR workload of 3-5 METs'},{pct:100,desc:'Chronic congestive heart failure, workload of 3 METs or less, or ejection fraction of 30% or less'}],
+  // Gastrointestinal
+  'gerd':             [{pct:10,desc:'Two or more episodes of esophagitis, or two or more hospitalizations; OR continuous medication required'},{pct:30,desc:'Daily esophageal regurgitation, heartburn, and pyrosis with two or more episodes of esophagitis per year'}],
+  'ibs':              [{pct:0,desc:'Mild IBS'},{pct:10,desc:'Moderate irritable colon syndrome with occasional mucous discharge, with disturbances of bowel function with lower abdominal cramps'},{pct:30,desc:'Severe irritable colon syndrome — diarrhea, or alternating diarrhea and constipation, with more or less constant abdominal distress'}],
+  // Other common
+  'diabetes':         [{pct:10,desc:'Manageable by restricted diet only'},{pct:20,desc:'Requires insulin, restricted diet, or oral hypoglycemic agent'},{pct:40,desc:'Requires insulin and restricted diet with episodes of ketoacidosis or hypoglycemic reactions requiring hospitalization'},{pct:60,desc:'Requires insulin and restricted diet; regulation of activities'},{pct:100,desc:'Causing acidosis or coma at least once a year, OR requiring daily insulin, plus restricted diet, plus regulation of activities'}],
+  'fibromyalgia':     [{pct:10,desc:'Widespread musculoskeletal pain with associated fatigue — symptoms require continuous medication for control'},{pct:20,desc:'Episodes of widespread musculoskeletal pain with fatigue, cognitive symptoms, and sleep disturbance occurring more than one-third of the time'},{pct:40,desc:'Constant or nearly constant widespread musculoskeletal pain and fatigue, refractory to therapy'}],
+  'chronic fatigue':  [{pct:10,desc:'Debilitating fatigue, cognitive impairments, or a combination of other signs and symptoms that are episodic (about 10-25% of the time)'},{pct:20,desc:'Debilitating fatigue, cognitive impairments, or a combination of symptoms that are episodic (about 25-50% of the time)'},{pct:40,desc:'Debilitating fatigue, cognitive impairments, or symptoms 50-75% of the time'},{pct:60,desc:'Nearly constant debilitating fatigue, cognitive impairments, or symptoms'}],
+  'erectile':         [{pct:0,desc:'Erectile dysfunction is rated 0% — but if service-connected, it qualifies for Special Monthly Compensation (SMC-K) which adds approximately $130/month on top of your combined rating. Always file even at 0%.'}],
+  // Default fallback
+  'default':          [{pct:10,desc:'Mild — minimal symptoms with little functional impairment; controllable with treatment'},{pct:30,desc:'Moderate — occasional symptoms affecting occupational and social function'},{pct:50,desc:'Moderately severe — significant impact on daily and occupational function'},{pct:70,desc:'Severe — frequent and debilitating symptoms affecting most areas of life'},{pct:100,desc:'Total — complete occupational and social impairment'}]
 };
 function getRatingCriteria(condName) {
   const name = (condName || '').toLowerCase();
@@ -1409,7 +1435,6 @@ function renderCondCard(c, typeColors, typeLabels) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px">
           <span class="cond-pri-badge badge-${c.type}">${label}</span>
           ${c.filing_order ? `<span style="font-size:10px;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 6px;font-weight:600">File #${c.filing_order}</span>` : ''}
-          ${c.targetRating ? `<span style="font-size:10px;background:#C9A84C;color:#002855;border-radius:4px;padding:1px 7px;font-weight:700">Target ${c.targetRating}%</span>` : ''}
           ${c.secondaryTo ? `<span style="font-size:11px;color:var(--text-sec)">↳ Secondary to ${c.secondaryTo}</span>` : ''}
           ${c.cfr ? `<span style="font-size:10px;color:var(--text-hint)">${c.cfr}</span>` : ''}
           ${dc ? `<span class="cond-dc-badge">DC ${dc.code}</span>` : ''}
@@ -1431,8 +1456,8 @@ function renderCondCard(c, typeColors, typeLabels) {
       ${c.action ? `<div class="cond-next-step"><div class="cond-next-step-label">Your Next Step</div><div class="cond-next-step-text">${c.action}</div></div>` : ''}
       ${c.ratingCriteria?.length ? `
       <div class="rating-criteria">
-        <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `Diagnostic Code ${dc.code}` : '38 CFR Part 4'}</div>
-        <div class="rating-criteria-sub">Describe your <strong>worst days</strong> at your C&amp;P exam. The examiner checks which row your symptoms match.</div>
+        <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `DC ${dc.code}` : '38 CFR Part 4'}</div>
+        <div class="rating-criteria-sub">Read each row and match your symptoms. This is how VA assigns your rating — <strong>you decide what to enter in your tracker</strong>.</div>
         ${c.ratingCriteria.map(r => `
           <div class="rating-row">
             <div class="r-pct">${r.pct}%</div>
@@ -1441,10 +1466,14 @@ function renderCondCard(c, typeColors, typeLabels) {
               ${r.keywords ? `<div class="r-keywords">Key words: ${r.keywords}</div>` : ''}
             </div>
           </div>`).join('')}
+        <div class="rating-criteria-cta">
+          <span style="font-size:12px;color:var(--text-sec)">Know which rating fits your symptoms?</span>
+          <button class="btn btn-outline btn-sm" onclick="showPage('tracker')" style="margin-left:10px">Set Target in Tracker →</button>
+        </div>
       </div>` : ''}
       ${cpTips?.length ? `
       <div class="cp-tips-box">
-        <div class="cp-tips-hdr">🎯 C&amp;P Exam Prep — What the examiner is looking for</div>
+        <div class="cp-tips-hdr">🎯 C&amp;P Exam Prep</div>
         ${cpTips.map(t => `<div class="cp-tip-row">• ${t}</div>`).join('')}
       </div>` : ''}
     </div>
@@ -1927,7 +1956,7 @@ function printRoadmap() {
         ${c.filing_order ? `<span style="font-size:11px;background:#F1F5F9;color:#334155;padding:2px 8px;border-radius:3px;font-weight:700">File #${c.filing_order}</span>` : ''}
         <strong style="font-size:16px;color:#002855">${c.name}</strong>
         <span style="font-size:11px;background:#002855;color:white;padding:2px 8px;border-radius:3px">${typeLabels[c.type]||c.type}</span>
-        ${c.targetRating ? `<span style="font-size:11px;background:#C9A84C;color:#002855;padding:2px 8px;border-radius:3px;font-weight:700">Target: ${c.targetRating}%</span>` : ''}
+
         ${c.secondaryTo ? `<span style="font-size:11px;color:#666">↳ Secondary to ${c.secondaryTo}</span>` : ''}
         ${c.cfr ? `<span style="font-size:10px;color:#999">${c.cfr}</span>` : ''}
       </div>
