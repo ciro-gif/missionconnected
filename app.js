@@ -1002,6 +1002,105 @@ Return ONLY the JSON array, nothing else.`;
   }
 }
 
+// ── ROADMAP JSON REPAIR ──
+// The AI sometimes produces JSON with unescaped apostrophes, literal newlines, or
+// trailing commas inside string values. This function repairs the most common cases.
+function safeParseRoadmapJSON(raw) {
+  // First attempt: direct parse
+  try { return JSON.parse(raw); } catch(e1) {}
+
+  // Second attempt: sanitize common issues inside string values
+  let fixed = raw;
+
+  // Remove any literal control characters inside strings (newlines, tabs embedded in values)
+  // Strategy: walk char by char, track if inside string, escape problematic chars
+  try {
+    fixed = repairJSON(raw);
+    return JSON.parse(fixed);
+  } catch(e2) {}
+
+  // Third attempt: extract just the fields we need via regex fallback
+  try {
+    return extractRoadmapFields(raw);
+  } catch(e3) {
+    throw new Error('Could not parse roadmap JSON: ' + e1?.message);
+  }
+}
+
+function repairJSON(str) {
+  let result = '';
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+
+    if (escape) {
+      result += ch;
+      escape = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      escape = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+
+    if (inString) {
+      // Escape literal control characters that break JSON
+      if (ch === '\n') { result += '\\n'; continue; }
+      if (ch === '\r') { result += '\\r'; continue; }
+      if (ch === '\t') { result += '\\t'; continue; }
+      // Unescaped single quotes are fine in JSON strings — skip
+      result += ch;
+    } else {
+      // Outside strings: remove trailing commas before ] or }
+      if (ch === ',' ) {
+        // Look ahead for closing bracket
+        let j = i + 1;
+        while (j < str.length && /\s/.test(str[j])) j++;
+        if (str[j] === ']' || str[j] === '}') {
+          continue; // skip trailing comma
+        }
+      }
+      result += ch;
+    }
+  }
+  return result;
+}
+
+function extractRoadmapFields(str) {
+  // Last resort: regex extract key fields
+  const get = (key) => { const m = str.match(new RegExp('"' + key + '"\\s*:\\s*"([^"]*)"')); return m?.[1] || ''; };
+  const getNum = (key) => { const m = str.match(new RegExp('"' + key + '"\\s*:\\s*(\\d+)')); return m ? parseInt(m[1]) : 0; };
+
+  // Extract conditions array as best we can
+  const condMatches = [...str.matchAll(/"name"\s*:\s*"([^"]+)"/g)];
+  const conditions = condMatches.map((m, i) => ({
+    name: m[1], type: 'direct', priority: 'high', filing_order: i+1,
+    targetRating: 0, nexus: '', evidence_have: '', evidence_need: '',
+    options: [], action: 'See your roadmap for details', secondaryTo: '', cfr: '', checks: []
+  }));
+
+  return {
+    summary: get('summary') || 'Roadmap generated — review your conditions below.',
+    pathway: get('pathway') || 'DIRECT',
+    strategy: get('strategy') || '',
+    filing_sequence: get('filing_sequence') || '',
+    totalConditions: conditions.length || getNum('totalConditions'),
+    conditions,
+    tdiu: false, tdiu_note: '', pact_note: get('pact_note') || '',
+    top_action: get('top_action') || ''
+  };
+}
+
 // ── ROADMAP BUILDER ──
 async function buildRoadmap() {
   goToScreen(16);
@@ -1250,7 +1349,7 @@ RULES:
 
 RETURN THIS JSON STRUCTURE (minified):
 {"summary":"2-3 sentences on legal position and overall strategy","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence on why this sequence and approach","filing_sequence":"Plain English e.g.: File conditions 1+2 simultaneously. Once rated, file condition 3 as secondary.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"for presumptive: note VA duty; for direct: describe required medical link","evidence_have":"what veteran already has","evidence_need":"what is still needed","options":["Option A: ...","Option B: ..."],"action":"single most important next step","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action across the whole claim"}
-MINIFIED JSON ONLY.`;
+CRITICAL: Return ONLY valid minified JSON. No markdown, no code fences. All string values must be short. No apostrophes (write "its" not "it's"). No literal line breaks inside strings.`;
 
     try {
     const data = await callClaude([{role:'user',content:prompt}], 2500);
@@ -1266,7 +1365,7 @@ MINIFIED JSON ONLY.`;
       if (!jsonMatch) throw new Error('No JSON in response: ' + text.slice(0, 200));
       clean = jsonMatch[0];
     }
-    roadmapData = JSON.parse(clean);
+    roadmapData = safeParseRoadmapJSON(clean);
 
     // Build conditions from roadmap
     conditions = roadmapData.conditions?.map((c, i) => ({
