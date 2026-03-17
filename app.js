@@ -404,7 +404,7 @@ function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
   currentView = id;
-  if (id === 'vApp') showAyleneFloat();
+  if (id === 'vApp' && roadmapData) showAyleneFloat();
   // When going to vApp, default to roadmap (not dashboard) unless we have one
   if (id === 'vApp' && currentPage === 'dashboard' && !roadmapData) {
     showPage('roadmap');
@@ -854,11 +854,11 @@ function goToScreen(n) {
   if (n === 5) buildMOSList();
   if (n === 9) buildRatedGrid();
   if (n === 10) buildSymptomGrids();
-  if (n === 15) loadFollowups();
+  // Screen 15 (followups) is now skipped — no need to load
 }
 
 function nextScreen() {
-  if (currentScreen >= 15) { buildRoadmap(); return; }
+  if (currentScreen >= 14) { buildRoadmap(); return; } // Skip screen 15 (followup Qs) - roadmap prompt handles context
   goToScreen(currentScreen + 1);
 }
 function prevScreen() { if (currentScreen > 1) goToScreen(currentScreen - 1); }
@@ -897,7 +897,7 @@ function renderMOSItems(container, data) {
   list.slice(0, 15).forEach(m => {
     const el = document.createElement('div');
     el.className = 'mos-item' + (ans.mos?.code === m.code ? ' selected' : '');
-    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.label||m.title||''}</div><div class="mos-tags">${m.tera?'<span class="mos-tag tag-amber">TERA</span>':''}</div><div class="mos-check">✓</div>`;
+    el.innerHTML = `<div class="mos-code">${m.code}</div><div class="mos-label">${m.label||m.title||''}</div><div class="mos-tags"></div><div class="mos-check">✓</div>`;
     el.onclick = () => selectMOS(el, m);
     container.appendChild(el);
   });
@@ -929,7 +929,7 @@ function selectMOS(el, m) {
   if (!intel) return;
   intel.classList.add('show');
   intel.innerHTML = `<div class="mos-intel-title">⚡ Intelligence Report: ${m.code} — ${m.label||m.title||''}</div>
-    <div>${(m.tags||[]).map(t=>`<span class="intel-tag intel-${t==='TERA'?'amber':'blue'}">${t}</span>`).join('')}</div>
+    <div>${(m.tags||[]).filter(t=>t!=='TERA').map(t=>`<span class="intel-tag intel-blue">${t}</span>`).join('')}</div>
     <div class="mos-intel-body">${m.notes || m.intel || 'Your roadmap will detail specific conditions associated with this specialty.'}</div>`;
 }
 
@@ -1005,6 +1005,7 @@ Return ONLY the JSON array, nothing else.`;
 // ── ROADMAP BUILDER ──
 async function buildRoadmap() {
   goToScreen(16);
+  setTimeout(startC101Carousel, 100);
   const loadingSteps = ['ls1','ls2','ls3','ls4','ls5','ls6'];
   let step = 0;
   const stepInterval = setInterval(() => {
@@ -1293,6 +1294,7 @@ MINIFIED JSON ONLY.`;
     logActivity('roadmap_generated', `🗺️ Roadmap generated — ${roadmapData.conditions?.length || 0} conditions identified`);
     showView('vApp');
     updateSidebar();
+    stopC101Carousel();
     showLandingMoment(roadmapData);
   } catch(e) {
     clearInterval(stepInterval);
@@ -1427,6 +1429,7 @@ function renderCondCard(c, typeColors, typeLabels) {
   const label = typeLabels[c.type] || c.type;
   const dc = getDiagnosticCode(c.name);
   const cpTips = getCPTips(c.name);
+  const criteria = c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name);
   return `
   <div class="cond-card">
     <div class="cond-card-hdr lborder-${c.type}" onclick="toggleCondBody(this)">
@@ -1454,11 +1457,11 @@ function renderCondCard(c, typeColors, typeLabels) {
         ${c.options.map((opt, i) => `<div class="cond-option-row"><span class="cond-option-num">${i+1}</span><span>${opt}</span></div>`).join('')}
       </div>` : ''}
       ${c.action ? `<div class="cond-next-step"><div class="cond-next-step-label">Your Next Step</div><div class="cond-next-step-text">${c.action}</div></div>` : ''}
-      ${c.ratingCriteria?.length ? `
+      ${criteria?.length ? `
       <div class="rating-criteria">
         <div class="rating-criteria-hdr">📊 VA Rating Schedule — ${dc ? `DC ${dc.code}` : '38 CFR Part 4'}</div>
         <div class="rating-criteria-sub">Read each row and match your symptoms. This is how VA assigns your rating — <strong>you decide what to enter in your tracker</strong>.</div>
-        ${c.ratingCriteria.map(r => `
+        ${criteria.map(r => `
           <div class="rating-row">
             <div class="r-pct">${r.pct}%</div>
             <div class="r-desc">
@@ -1943,7 +1946,7 @@ function toggleCheck(condId, checkIdx) {
 }
 
 function printRoadmap() {
-  const printConds = conditions.length ? conditions : (roadmapData?.conditions?.map((c,i) => ({...c, id:'p-'+i, secondaryTo:c.secondaryTo||'', targetRating:c.targetRating||0, ratingCriteria: typeof getRatingCriteria==='function' ? getRatingCriteria(c.name) : []})) || []);
+  const printConds = (conditions.length ? conditions : (roadmapData?.conditions?.map((c,i) => ({...c, id:'p-'+i, secondaryTo:c.secondaryTo||'', targetRating:c.targetRating||0})) || [])).map(c => ({...c, ratingCriteria: (c.ratingCriteria?.length ? c.ratingCriteria : getRatingCriteria(c.name))}));
   if (!roadmapData || !printConds.length) { alert('Complete your screener first to generate a roadmap to print.'); return; }
   const branch = ans.branch?.[0] || 'Veteran';
   const mos = ans.mos?.code ? `${ans.mos.code} — ${ans.mos.title||ans.mos.label||''}` : '';
@@ -2415,18 +2418,21 @@ function renderFiles() {
     const size = (f.file.size / 1024 / 1024).toFixed(1);
     const icon = f.file.type.includes('pdf') ? '📄' : f.file.type.includes('image') ? '🖼️' : f.file.type.includes('word') ? '📝' : '📁';
     const blobUrl = f.blobUrl || (f.blobUrl = URL.createObjectURL(f.file));
-    return `<div class="file-item" id="fi-${f.id}">
+    const safeId = f.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    uploadedFiles[uploadedFiles.indexOf(f)]._safeId = safeId;
+    window['_fmap_' + safeId] = f.id;
+    return `<div class="file-item" id="fi-${safeId}">
       <div class="file-item-icon">${icon}</div>
       <div style="flex:1;min-width:0">
-        <div class="file-item-name-wrap" id="fwrap-${f.id}">
+        <div class="file-item-name-wrap" id="fwrap-${safeId}">
           <a class="file-item-name" href="${blobUrl}" target="_blank" title="Open file">${f.displayName}</a>
-          <button class="btn-rename" onclick="startRename('${f.id}')" title="Rename">✏️</button>
+          <button class="btn-rename" onclick="startRename(window['_fmap_${safeId}'])" title="Rename">✏️</button>
         </div>
         <div class="file-item-meta">${size} MB · ${f.file.type || 'document'} · <a href="${blobUrl}" download="${f.displayName}" style="color:var(--sky);font-size:11px">Download ↓</a></div>
       </div>
-      <button class="btn-analyze-file" onclick="analyzeFileWithAylene('${f.id}')">💬 Ask Aylene</button>
+      <button class="btn-analyze-file" onclick="analyzeFileWithAylene(window['_fmap_${safeId}'])">💬 Ask Aylene</button>
       <span class="badge-ready">Ready</span>
-      <button class="btn-remove-file" onclick="removeFile('${f.id}')">✕</button>
+      <button class="btn-remove-file" onclick="removeFile(window['_fmap_${safeId}'])">✕</button>
     </div>`;
   }).join('');
 }
@@ -2763,6 +2769,7 @@ function closeLandingMoment() {
   renderRoadmap(roadmapData);
   renderDashboard();
   updateSidebar();
+  showAyleneFloat();
 }
 
 // ── C&P EXAM PREP ──
@@ -3192,6 +3199,34 @@ ${ans.deployments?.some(d => /gulf|iraq|afghanistan|oif|oef|vietnam|swa/i.test(d
     document.getElementById(typingId)?.remove();
     appendFloatMsg('ai', "Connection issue — try again in a moment.");
   }
+}
+
+// ── CLAIMS 101 CAROUSEL ──
+let _c101Timer = null;
+let _c101Current = 0;
+
+function showC101(idx) {
+  const cards = document.querySelectorAll('.c101-card');
+  const dots = document.querySelectorAll('.c101-dot');
+  cards.forEach((c, i) => c.classList.toggle('active', i === idx));
+  dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  _c101Current = idx;
+}
+
+function startC101Carousel() {
+  _c101Current = 0;
+  showC101(0);
+  clearInterval(_c101Timer);
+  _c101Timer = setInterval(() => {
+    const total = document.querySelectorAll('.c101-card').length;
+    _c101Current = (_c101Current + 1) % total;
+    showC101(_c101Current);
+  }, 3000);
+}
+
+function stopC101Carousel() {
+  clearInterval(_c101Timer);
+  _c101Timer = null;
 }
 
 // ── CLAUDE API ──
