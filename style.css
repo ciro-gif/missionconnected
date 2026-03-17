@@ -1569,3 +1569,44 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   border-top: 1px solid #F1F5F9;
   margin-top: 8px;
 }
+
+/* ── CLAIMS 101 CAROUSEL ── */
+.claims-101-carousel {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 140px;
+}
+.c101-card {
+  display: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 16px 18px;
+  text-align: left;
+  animation: c101Fade .35s ease;
+}
+.c101-card.active { display: block; }
+@keyframes c101Fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.c101-icon { font-size: 24px; margin-bottom: 6px; }
+.c101-title { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+.c101-body { font-size: 13px; color: var(--text-main); line-height: 1.6; }
+.c101-body strong { color: var(--navy); }
+.c101-body em { color: var(--sky); font-style: normal; font-weight: 600; }
+.c101-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.c101-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #D1D5DB;
+  cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.c101-dot.active { background: var(--gold); transform: scale(1.3); }
