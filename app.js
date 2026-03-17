@@ -2364,7 +2364,10 @@ async function sendMessage() {
     chatHistory.push({ role: 'assistant', content: reply });
   } catch(e) {
     hideTyping();
-    appendMsg('ai', "Sorry, I'm having trouble connecting right now. Try again in a moment.");
+    const msg = e.message?.includes('overloaded') || e.message?.includes('529')
+      ? "API is a little busy right now — give it a few seconds and try again."
+      : "Having trouble connecting. Check your connection and try again.";
+    appendMsg('ai', msg);
   }
   document.getElementById('sendBtn').disabled = false;
 }
@@ -3187,7 +3190,10 @@ ${ans.deployments?.some(d => /gulf|iraq|afghanistan|oif|oef|vietnam|swa/i.test(d
     floatHistory.push({ role: 'assistant', content: reply });
   } catch(e) {
     document.getElementById(typingId)?.remove();
-    appendFloatMsg('ai', "Connection issue — try again in a moment.");
+    const msg = e.message?.includes('overloaded') || e.message?.includes('529')
+      ? 'API is a little busy right now — try again in a few seconds.'
+      : 'Connection issue — try again in a moment.';
+    appendFloatMsg('ai', msg);
   }
 }
 
@@ -3234,9 +3240,10 @@ function stopC101Carousel() {
 }
 
 // ── CLAUDE API ──
-async function callClaude(messages, maxTokens = 800, system = '', retries = 2) {
+async function callClaude(messages, maxTokens = 800, system = '', retries = 3) {
   const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 3000), messages };
   if (system) body.system = system;
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3249,21 +3256,37 @@ async function callClaude(messages, maxTokens = 800, system = '', retries = 2) {
         },
         body: JSON.stringify(body)
       });
-      if (res.status === 429) {
-        // Rate limited — wait and retry
-        const wait = (attempt + 1) * 15000; // 15s, 30s
-        console.warn(`Rate limited. Waiting ${wait/1000}s before retry ${attempt+1}/${retries}...`);
+
+      // 429 = rate limited, 529 = overloaded — both get exponential backoff retry
+      if (res.status === 429 || res.status === 529) {
+        if (attempt >= retries) {
+          const label = res.status === 529 ? 'overloaded' : 'rate limited';
+          throw new Error(`API ${label} after ${retries} retries. Please try again in a moment.`);
+        }
+        // Exponential backoff with jitter: 3s, 9s, 27s (+/- 1s random)
+        const base = Math.pow(3, attempt + 1) * 1000;
+        const jitter = Math.random() * 1000;
+        const wait = base + jitter;
+        console.warn(`API ${res.status} (attempt ${attempt + 1}/${retries}). Retrying in ${Math.round(wait/1000)}s...`);
         await new Promise(r => setTimeout(r, wait));
         continue;
       }
+
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(`Claude API error: ${res.status} — ${errData?.error?.message || ''}`);
+        throw new Error(`Claude API error: ${res.status} — ${errData?.error?.message || res.statusText}`);
       }
+
       return await res.json();
+
     } catch(e) {
-      if (attempt >= retries) throw e;
-      await new Promise(r => setTimeout(r, 5000));
+      // Network errors (no internet, DNS, etc.) — short retry
+      if (attempt < retries && !e.message.includes('API')) {
+        const wait = (attempt + 1) * 3000;
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
     }
   }
   throw new Error('Max retries exceeded');
