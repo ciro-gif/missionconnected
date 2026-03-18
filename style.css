@@ -1631,3 +1631,203 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   width: 0%;
   transition: width 0.05s linear;
 }
+
+/* ── FILING STRATEGY SECTION ── */
+.filing-strategy-section {
+  background: var(--navy);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.fs-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.fs-icon { font-size: 22px; }
+.fs-titles .fs-title { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: .02em; }
+.fs-titles .fs-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
+.fs-steps { display: flex; flex-direction: column; gap: 12px; }
+.fs-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: rgba(255,255,255,.06);
+  border-radius: 7px;
+  padding: 12px 14px;
+}
+.fs-step-num {
+  min-width: 28px;
+  height: 28px;
+  background: var(--gold);
+  color: var(--navy);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.fs-step-body, .fs-step-text { font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.6; }
+.fs-step-plain { font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.7; }
+
+/* ── SECONDARY AI OPPORTUNITIES SECTION ── */
+.secondary-ai-section {
+  background: linear-gradient(135deg, #1a1a3e 0%, #0d1b3e 100%);
+  border: 1px solid rgba(201,168,76,.3);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.sas-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.sas-icon { font-size: 24px; margin-top: 2px; }
+.sas-title { font-size: 15px; font-weight: 700; color: #C9A84C; }
+.sas-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 3px; line-height: 1.5; }
+.sas-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  background: rgba(255,255,255,.05);
+  border-radius: 7px;
+  margin-bottom: 10px;
+}
+.sas-item-left { flex: 1; min-width: 0; }
+.sas-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 5px; }
+.sas-tag { font-size: 10px; background: rgba(0,118,206,.25); color: #7DD3FC; padding: 1px 7px; border-radius: 10px; font-weight: 500; margin-left: 6px; }
+.sas-rationale { font-size: 12px; color: rgba(255,255,255,.65); line-height: 1.55; margin-bottom: 5px; }
+.sas-rating { font-size: 11px; color: var(--gold); font-weight: 600; }
+.sas-footer { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+
+/* ── REGULATION SOURCE LINK ── */
+.reg-source-link {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.reg-source-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sky);
+  text-decoration: none;
+  padding: 6px 12px;
+  background: rgba(125,211,252,.08);
+  border: 1px solid rgba(125,211,252,.2);
+  border-radius: 6px;
+  transition: background .15s;
+}
+.reg-source-link a:hover { background: rgba(125,211,252,.15); }
+
+/* ── FILING STRATEGY SECTION ── */
+.filing-strategy-section {
+  background: var(--surface);
+  border: 1.5px solid var(--sky);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.fs-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #002855 0%, #003d80 100%);
+  color: white;
+}
+.fs-icon { font-size: 24px; flex-shrink: 0; }
+.fs-title { font-size: 15px; font-weight: 700; font-family: 'Oswald', sans-serif; letter-spacing: .04em; }
+.fs-sub { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
+.fs-steps { padding: 0 20px 16px; }
+.fs-step {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fs-step:last-child { border-bottom: none; }
+.fs-step-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: var(--navy);
+  border-radius: 4px;
+  padding: 3px 8px;
+  flex-shrink: 0;
+  height: fit-content;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.fs-step-body { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+/* ── SECONDARY AI OPPORTUNITIES ── */
+.secondary-ai-section {
+  background: var(--surface);
+  border: 1.5px solid #6D28D9;
+  border-radius: 10px;
+  margin: 20px 0;
+  overflow: hidden;
+}
+.sas-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #3B0764 0%, #6D28D9 100%);
+  color: white;
+}
+.sas-icon { font-size: 24px; flex-shrink: 0; }
+.sas-title { font-size: 15px; font-weight: 700; font-family: 'Oswald', sans-serif; }
+.sas-sub { font-size: 12px; color: rgba(255,255,255,.75); margin-top: 3px; line-height: 1.5; }
+.sas-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.sas-item:last-of-type { border-bottom: none; }
+.sas-item-left { flex: 1; }
+.sas-name { font-size: 14px; font-weight: 700; color: var(--navy); }
+.sas-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6D28D9;
+  background: #F3E8FF;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+.sas-rationale { font-size: 12px; color: var(--text-sec); margin-top: 4px; line-height: 1.5; }
+.sas-rating { font-size: 11px; color: var(--text-hint); margin-top: 4px; }
+.sas-footer {
+  padding: 10px 20px;
+  font-size: 11px;
+  color: var(--text-hint);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+/* ── VA REGULATIONS — sources & links ── */
+.reg-sources { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.reg-sources-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-hint); margin-bottom: 8px; }
+.reg-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sky);
+  text-decoration: none;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reg-link:last-child { border-bottom: none; }
+.reg-link:hover { color: var(--navy); text-decoration: underline; }
