@@ -1355,7 +1355,7 @@ STRICT RULES — READ CAREFULLY:
 4. For type:presumptive nexus: state which law grants presumption (e.g. "PACT Act 38 CFR 3.309(e) — no nexus letter required to file").
 5. Do NOT cite any CFR section not mentioned in the VERIFIED LEGAL PATHWAY above. If unsure, omit the citation.
 6. targetRating: CPAP machine required=50, daily bronchodilator=30, tinnitus=10 (max), PTSD mild/transient=10 occupational decrease=30 reduced reliability=50 deficiencies most areas=70 total impairment=100, hypertension diastolic 100-109=10 110-119=20 120+=40
-7. 2-4 conditions maximum, each directly tied to documented profile above
+7. Generate ALL conditions directly supported by this veteran's documented symptoms, diagnoses, MOS, and exposures. Simple profiles: 3-5 conditions. Complex profiles (combat veterans, multiple deployments, multiple symptom categories): up to 8 conditions. Never pad with unsupported conditions. Every condition MUST have a non-empty name field — never return a condition with a blank or missing name
 8. options: exactly 2 real choices the veteran faces — not generic instructions
 9. checks: exactly 3 specific action items for this veteran
 
@@ -1364,7 +1364,7 @@ RETURN THIS JSON STRUCTURE (minified):
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 2500);
+    const data = await callClaude([{role:'user',content:prompt}], 4000);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -1380,7 +1380,7 @@ CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No li
     roadmapData = safeParseRoadmapJSON(clean);
 
     // Build conditions from roadmap
-    conditions = roadmapData.conditions?.map((c, i) => ({
+    conditions = roadmapData.conditions?.filter(c => c.name?.trim()).map((c, i) => ({
       id: 'local-'+i, name: c.name, rating: 0, col: 'todo',
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
       nexus: c.nexus, evidence_have: c.evidence_have, evidence_need: c.evidence_need,
@@ -3371,7 +3371,7 @@ function stopC101Carousel() {
 
 // ── CLAUDE API ──
 async function callClaude(messages, maxTokens = 800, system = '', retries = 3) {
-  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 3000), messages };
+  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 4000), messages };
   if (system) body.system = system;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
