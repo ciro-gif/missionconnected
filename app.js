@@ -1361,7 +1361,7 @@ STRICT RULES — READ CAREFULLY:
 10. secondary_opportunities: ALWAYS populate this array with 1-3 secondary conditions the veteran likely qualifies for but may NOT be aware of, based on the primary conditions you identified above. These are in a SEPARATE array from conditions — they are never omitted due to token limits. Examples: sleep apnea secondary to asthma, hypertension secondary to PTSD, GERD secondary to SC medication side effects.
 
 RETURN THIS JSON STRUCTURE (minified):
-{"summary":"1 concise sentence (max 20 words) describing this veteran's claim situation — plain language, no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_strategy":"Detailed numbered step-by-step plan (5-7 steps). Each step: what to do, why it matters, evidence needed, timing. Specific to THIS veteran's profile — not generic.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this condition follows from their primary SC condition","target_rating":0}]}
+{"summary":"1 concise sentence (max 20 words) describing this veteran's claim situation — plain language, no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_strategy":"Exactly 5 steps. Format MUST be: Step 1: [one sentence action]. Step 2: [one sentence action]. Each step is ONE sentence maximum. No parentheticals. No weeks/timing. Just the action.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this condition follows from their primary SC condition","target_rating":0}]}
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
@@ -1501,12 +1501,12 @@ function renderRoadmap(data) {
   // Filing sequence banner
   const _stratText = data.filing_strategy || data.filing_sequence;
   if (_stratText) {
-    const _steps = _stratText.split(/(?=Step\s*\d+:)/i).map(s => s.trim()).filter(s => s.length > 8);
+    const _steps = _stratText.split(/(?=Step\s*\d+[\s:(])/i).map(s => s.trim()).filter(s => s.length > 6);
     const _stepsHtml = _steps.length > 1
       ? _steps.map((s, i) => {
-          const m = s.match(/^(Step\s*\d+:?)\s*(.*)/is);
-          const num = m ? m[1].replace(':','') : 'Step ' + (i+1);
-          const body = m ? m[2] : s;
+          const m = s.match(/^(Step\s*\d+)[^:]*:\s*(.*)/is);
+          const num = m ? m[1] : 'Step ' + (i + 1);
+          const body = (m ? m[2] : s).split(/(?=Step\s*\d+[\s:(])/i)[0].trim();
           return `<div class="fs-step"><div class="fs-step-num">${num}</div><div class="fs-step-body">${body}</div></div>`;
         }).join('')
       : `<div class="fs-step"><div class="fs-step-body">${_stratText}</div></div>`;
