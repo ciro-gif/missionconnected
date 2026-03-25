@@ -1655,28 +1655,29 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
 .fs-icon { font-size: 22px; flex-shrink: 0; }
 .fs-title { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: .02em; }
 .fs-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
-.fs-steps { padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.fs-steps { padding: 8px 16px 14px; display: flex; flex-direction: column; gap: 6px; }
 .fs-step {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  background: rgba(255,255,255,.06);
-  border-radius: 7px;
-  padding: 11px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 10px 4px;
 }
+.fs-step:last-child { border-bottom: none; }
 .fs-step-num {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   color: var(--navy);
   background: var(--gold);
-  border-radius: 4px;
-  padding: 2px 8px;
+  border-radius: 3px;
+  padding: 2px 7px;
   flex-shrink: 0;
   margin-top: 2px;
   white-space: nowrap;
+  letter-spacing: .3px;
 }
-.fs-step-body { font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.6; }
-.fs-step-plain { font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.7; }
+.fs-step-body { font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.55; }
+.fs-step-plain { font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.55; }
 
 /* ── SECONDARY AI OPPORTUNITIES SECTION ── */
 .secondary-ai-section {
