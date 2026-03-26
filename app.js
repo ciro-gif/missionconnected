@@ -1093,7 +1093,7 @@ function extractRoadmapFields(str) {
     summary: get('summary') || 'Roadmap generated — review your conditions below.',
     pathway: get('pathway') || 'DIRECT',
     strategy: get('strategy') || '',
-    filing_sequence: get('filing_sequence') || '',
+    filing_sequence: get('filing_sequence') || get('filing_strategy') || '',
     totalConditions: conditions.length || getNum('totalConditions'),
     conditions,
     tdiu: false, tdiu_note: '', pact_note: get('pact_note') || '',
@@ -1361,7 +1361,7 @@ STRICT RULES — READ CAREFULLY:
 10. secondary_opportunities: ALWAYS populate this array with 1-3 secondary conditions the veteran likely qualifies for but may NOT be aware of, based on the primary conditions you identified above. These are in a SEPARATE array from conditions — they are never omitted due to token limits. Examples: sleep apnea secondary to asthma, hypertension secondary to PTSD, GERD secondary to SC medication side effects.
 
 RETURN THIS JSON STRUCTURE (minified):
-{"summary":"1 concise sentence (max 20 words) describing this veteran's claim situation — plain language, no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_strategy":"Exactly 5 steps. Format MUST be: Step 1: [one sentence action]. Step 2: [one sentence action]. Each step is ONE sentence maximum. No parentheticals. No weeks/timing. Just the action.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this condition follows from their primary SC condition","target_rating":0}]}
+{"summary":"1 concise sentence (max 20 words) describing this veteran's claim situation — plain language, no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_sequence":"5 steps, each ONE sentence. Format exactly: Step 1: [action]. Step 2: [action]. Step 3: [action]. Step 4: [action]. Step 5: [action]. No long explanations. No timing. Just what to do.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 specific sentence — the single most important thing this veteran should do RIGHT NOW for this condition. Never say 'see your roadmap' or generic text.","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this condition follows from their primary SC condition","target_rating":0}]}
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
@@ -1499,7 +1499,7 @@ function renderRoadmap(data) {
   };
 
   // Filing sequence banner
-  const _stratText = data.filing_strategy || data.filing_sequence;
+  const _stratText = data.filing_strategy || data.filing_sequence || roadmapData?.filing_strategy || roadmapData?.filing_sequence;
   if (_stratText) {
     const _steps = _stratText.split(/(?=Step\s*\d+[\s:(])/i).map(s => s.trim()).filter(s => s.length > 6);
     const _stepsHtml = _steps.length > 1
