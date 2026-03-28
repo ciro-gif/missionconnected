@@ -6,7 +6,7 @@
 // ── SUPABASE ──
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
 const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
-const CLAUDE_KEY = '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';
+// API key is now private — stored in Netlify environment variables
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 let sbClient = null;
@@ -181,12 +181,12 @@ async function checkNetworkStatus() {
   label.textContent = 'Checking...';
   try {
     // Ping Claude API with minimal request
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{role:'user',content:'hi'}] })
     });
-    networkOk = res.ok || res.status === 529; // 529 = overloaded but reachable
+    networkOk = res.ok || res.status === 529;
     const sbOk = !!sbClient;
     if (res.ok) {
       dot.style.background = '#16A34A'; label.textContent = 'Online';
@@ -1093,7 +1093,7 @@ function extractRoadmapFields(str) {
     summary: get('summary') || 'Roadmap generated — review your conditions below.',
     pathway: get('pathway') || 'DIRECT',
     strategy: get('strategy') || '',
-    filing_sequence: get('filing_sequence') || get('filing_strategy') || '',
+    filing_sequence: get('filing_sequence') || '',
     totalConditions: conditions.length || getNum('totalConditions'),
     conditions,
     tdiu: false, tdiu_note: '', pact_note: get('pact_note') || '',
@@ -1322,7 +1322,7 @@ async function buildRoadmap() {
 
   const pathwayContext = pathwayLines.join('\n\n');
 
-  const prompt = `You are a rules applicator generating a VA disability roadmap in JSON. You apply ONLY the rules and facts provided below. You do not invent, assume, or add any VA regulations, pathways, or conditions not explicitly stated in this prompt.
+  const prompt = `You are a rules applicator generating a VA disability roadmap in JSON. You apply ONLY the legal rules and facts provided below. You do not invent, assume, or add any VA regulations, pathways, or conditions not explicitly stated in this prompt.
 
 VETERAN PROFILE:
 ${ans.branch?.join('/')} ${ans.component} | MOS ${ans.mos?.code||'?'} ${mosLabel} | ${ans.startYear}-${ans.endYear} | ${ans.discharge} discharge
@@ -1355,17 +1355,16 @@ STRICT RULES — READ CAREFULLY:
 4. For type:presumptive nexus: state which law grants presumption (e.g. "PACT Act 38 CFR 3.309(e) — no nexus letter required to file").
 5. Do NOT cite any CFR section not mentioned in the VERIFIED LEGAL PATHWAY above. If unsure, omit the citation.
 6. targetRating: CPAP machine required=50, daily bronchodilator=30, tinnitus=10 (max), PTSD mild/transient=10 occupational decrease=30 reduced reliability=50 deficiencies most areas=70 total impairment=100, hypertension diastolic 100-109=10 110-119=20 120+=40
-7. Generate ALL conditions supported by this veteran's documented symptoms, diagnoses, MOS, and exposures. Simple profiles: 3-5 conditions. Complex profiles (combat, multiple deployments, multiple symptom categories): up to 8. Never pad with unsupported conditions. Every condition MUST have a non-empty name field — never return a condition with a blank or missing name
+7. 2-4 conditions maximum, each directly tied to documented profile above
 8. options: exactly 2 real choices the veteran faces — not generic instructions
 9. checks: exactly 3 specific action items for this veteran
-10. secondary_opportunities: ALWAYS populate this array with 1-3 secondary conditions the veteran likely qualifies for but may NOT be aware of, based on the primary conditions you identified above. These are in a SEPARATE array from conditions — they are never omitted due to token limits. Examples: sleep apnea secondary to asthma, hypertension secondary to PTSD, GERD secondary to SC medication side effects.
 
 RETURN THIS JSON STRUCTURE (minified):
-{"summary":"1 concise sentence (max 20 words) describing this veteran's claim situation — plain language, no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_sequence":"5 steps, each ONE sentence. Format exactly: Step 1: [action]. Step 2: [action]. Step 3: [action]. Step 4: [action]. Step 5: [action]. No long explanations. No timing. Just what to do.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 specific sentence — the single most important thing this veteran should do RIGHT NOW for this condition. Never say 'see your roadmap' or generic text.","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this condition follows from their primary SC condition","target_rating":0}]}
+{"summary":"2-3 sentences on this veterans specific legal position","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_sequence":"plain English sequence","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action"}
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 4000);
+    const data = await callClaude([{role:'user',content:prompt}], 2500);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -1381,7 +1380,7 @@ CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No li
     roadmapData = safeParseRoadmapJSON(clean);
 
     // Build conditions from roadmap
-    conditions = roadmapData.conditions?.filter(c => c.name?.trim()).map((c, i) => ({
+    conditions = roadmapData.conditions?.map((c, i) => ({
       id: 'local-'+i, name: c.name, rating: 0, col: 'todo',
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
       nexus: c.nexus, evidence_have: c.evidence_have, evidence_need: c.evidence_need,
@@ -1451,8 +1450,9 @@ function renderRoadmap(data) {
     <div class="rm-hero">
       <div style="font-size:40px">🎯</div>
       <div>
-        <div class="rm-hero-tag">${data.conditions.length} Condition${data.conditions.length!==1?'s':''} Identified</div>
-        <div class="rm-hero-sub" style="font-size:13px;opacity:.85">${data.summary||''}</div>
+        <div class="rm-hero-tag">Your Personalized Blueprint</div>
+        <div class="rm-hero-title">${data.conditions.length} Conditions Identified</div>
+        <div class="rm-hero-sub">${data.summary||''}</div>
       </div>
     </div>
     <div class="legend-bar">
@@ -1499,58 +1499,13 @@ function renderRoadmap(data) {
   };
 
   // Filing sequence banner
-  const _stratText = data.filing_strategy || data.filing_sequence || roadmapData?.filing_strategy || roadmapData?.filing_sequence;
-  if (_stratText) {
-    const _steps = _stratText.split(/(?=Step\s*\d+[\s:(])/i).map(s => s.trim()).filter(s => s.length > 6);
-    const _stepsHtml = _steps.length > 1
-      ? _steps.map((s, i) => {
-          const m = s.match(/^(Step\s*\d+)[^:]*:\s*(.*)/is);
-          const num = m ? m[1] : 'Step ' + (i + 1);
-          const body = (m ? m[2] : s).split(/(?=Step\s*\d+[\s:(])/i)[0].trim();
-          return `<div class="fs-step"><div class="fs-step-num">${num}</div><div class="fs-step-body">${body}</div></div>`;
-        }).join('')
-      : `<div class="fs-step"><div class="fs-step-body">${_stratText}</div></div>`;
-    html += `<div class="filing-strategy-section">
-      <div class="fs-header">
-        <div class="fs-icon">📋</div>
-        <div>
-          <div class="fs-title">Your Filing Strategy</div>
-          <div class="fs-sub">Follow these steps in order — sequence matters</div>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick="requireAuth(()=>showPage('chat'))" style="margin-left:auto;color:white;border-color:rgba(255,255,255,.3)">Ask Aylene →</button>
-      </div>
-      <div class="fs-steps">${_stepsHtml}</div>
-    </div>`;
+  if (data.filing_sequence) {
+    html += `<div class="alert alert-blue" style="margin-bottom:12px"><span>📋</span><span><strong>Filing Strategy:</strong> ${data.filing_sequence}</span></div>`;
   }
 
   html += renderGroup(high, '🔴 High Priority');
   html += renderGroup(mid, '🟡 Medium Priority');
   html += renderGroup(low, '🔵 Lower Priority');
-
-  if (data.secondary_opportunities?.length) {
-    const _secOps = data.secondary_opportunities.filter(s => s.name?.trim());
-    if (_secOps.length) {
-      html += `<div class="secondary-ai-section">
-        <div class="sas-header">
-          <div class="sas-icon">💡</div>
-          <div>
-            <div class="sas-title">Secondary Opportunities You May Not Know About</div>
-            <div class="sas-sub">Based on your primary conditions — these additional claims are commonly won. Veterans often miss them.</div>
-          </div>
-        </div>
-        ${_secOps.map(s => `
-        <div class="sas-item">
-          <div class="sas-item-left">
-            <div class="sas-name">${s.name} <span class="sas-tag">secondary to ${s.secondary_to || s.secondaryTo || ''}</span></div>
-            <div class="sas-rationale">${s.rationale}</div>
-            ${(s.target_rating || 0) > 0 ? `<div class="sas-rating">Target rating: ${s.target_rating}%</div>` : `<div class="sas-rating">0% rated + SMC-K (~$130/mo added to your compensation)</div>`}
-          </div>
-          <button class="btn btn-outline btn-sm" onclick="askAyleneAboutSecondary('${(s.name||'').replace(/'/g,"\'")}','${(s.secondary_to||s.secondaryTo||'').replace(/'/g,"\'")}')">Ask Aylene</button>
-        </div>`).join('')}
-        <div class="sas-footer">Educational suggestions only. Consult an accredited VSO before filing.</div>
-      </div>`;
-    }
-  }
 
   if (data.top_action) {
     html += `<div class="rm-action-bar">
@@ -2109,7 +2064,7 @@ function printRoadmap() {
         ${c.secondaryTo ? `<span style="font-size:11px;color:#666">↳ Secondary to ${c.secondaryTo}</span>` : ''}
         ${c.cfr ? `<span style="font-size:10px;color:#999">${c.cfr}</span>` : ''}
       </div>
-      ${c.nexus ? `<div style="margin-bottom:8px;padding:6px 8px;background:#EFF6FF;border-left:3px solid #0050A0;border-radius:3px"><span style="font-weight:700;color:#0050A0;font-size:11px;text-transform:uppercase">Nexus / Claim Basis: </span><span style="font-size:12px">${c.nexus}</span></div>` : ''}
+      ${c.nexus ? `<div style="margin-bottom:8px;padding:6px 8px;background:#EFF6FF;border-left:3px solid #0050A0;border-radius:3px"><span style="font-weight:700;color:#0050A0;font-size:11px;text-transform:uppercase">Nexus / Legal Basis: </span><span style="font-size:12px">${c.nexus}</span></div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         ${c.evidence_have ? `<div style="padding:6px 8px;background:#F0FDF4;border-left:3px solid #16A34A;border-radius:3px"><div style="font-weight:700;color:#16A34A;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence You Have</div><div style="font-size:12px">${c.evidence_have}</div></div>` : ''}
         ${c.evidence_need ? `<div style="padding:6px 8px;background:#FFF5F5;border-left:3px solid #DC2626;border-radius:3px"><div style="font-weight:700;color:#DC2626;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence Still Needed</div><div style="font-size:12px">${c.evidence_need}</div></div>` : ''}
@@ -2507,7 +2462,7 @@ async function sendMessage() {
       `\n- Service: ${ans.startYear || '?'}–${ans.endYear || 'Present'}, Discharge: ${ans.discharge || 'Unknown'}` +
       `\n- Deployments: ${ans.deployments?.join(', ') || 'None listed'}` +
       `\n- Exposures: ${ans.exposures?.join(', ') || 'None listed'}` +
-      `\n- Pathway: ${roadmapData?.pathway || 'DIRECT'}` +
+      `\n- Legal pathway: ${roadmapData?.pathway || 'DIRECT'}` +
       `\n- Conditions in roadmap: ${(roadmapData?.conditions || conditions).map(c => c.name + (c.type === 'presumptive' ? ' (presumptive)' : c.type === 'secondary' ? ' (secondary to ' + (c.secondaryTo || '?') + ')' : ' (direct)')).join(', ')}` +
       `\n- Current VA status: ${ans.vaStatus || 'none'}, Prior ratings: ${ans.ratedConds?.join(', ') || 'none'}` +
       (() => {
@@ -2733,7 +2688,7 @@ const REGS = [
     items: [
       { code: '38 CFR § 3.303', title: 'Direct Service Connection', content: `
         <p class="reg-intro">Direct service connection means your condition was caused or aggravated by something that happened during your military service.</p>
-        <h3>The Three Required Elements</h3>
+        <h3>The Three Elements</h3>
         <div class="reg-list">
           <div class="reg-item"><div class="reg-num">1</div><div>A current, diagnosed condition</div></div>
           <div class="reg-item"><div class="reg-num">2</div><div>An in-service event, injury, or disease</div></div>
@@ -2741,19 +2696,13 @@ const REGS = [
         </div>
         <h3>Important Points</h3>
         <ul class="reg-bullets">
-          <li>You do not need a continuous chain of treatment records</li>
+          <li>You don't need a continuous chain of treatment records</li>
           <li>A nexus letter from a private doctor can provide the medical link</li>
           <li>Lay statements (yours and buddy statements) are valid evidence</li>
-          <li>Benefit of the doubt: when evidence is roughly equal, VA must decide in your favor</li>
-          <li>Continuity of symptomatology can substitute for a nexus letter for chronic conditions</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.303" target="_blank">📄 38 CFR § 3.303 — Full Text (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/eligibility/" target="_blank">🔗 VA Disability Eligibility — va.gov</a>
-        </div>` },
+          <li>The benefit of the doubt goes to the veteran when evidence is roughly equal</li>
+        </ul>` },
       { code: '38 CFR § 3.310', title: 'Secondary Service Connection', content: `
-        <p class="reg-intro">A condition is secondary if it was caused or aggravated by a condition that is already service-connected. The burden of proof is lower than direct service connection.</p>
+        <p class="reg-intro">A condition is secondary if it was caused or aggravated by a condition that is already service-connected.</p>
         <h3>Two Types</h3>
         <div class="reg-list">
           <div class="reg-item"><div class="reg-num">1</div><div><strong>Causation:</strong> The service-connected condition directly caused the new condition</div></div>
@@ -2761,293 +2710,95 @@ const REGS = [
         </div>
         <h3>Common Secondary Claims</h3>
         <ul class="reg-bullets">
-          <li>PTSD → Sleep Apnea, Depression, Hypertension, GERD, Substance Use</li>
-          <li>Asthma → Sleep Apnea (upper airway inflammation causes OSA)</li>
-          <li>Lumbar spine → Knee/Hip degeneration (altered gait)</li>
-          <li>Diabetes → Peripheral neuropathy, eye conditions, erectile dysfunction</li>
-          <li>Tinnitus → Anxiety, depression (chronic psychological distress)</li>
-          <li>TBI → Migraines, cognitive impairment, depression</li>
-        </ul>
-        <h3>Key Rule</h3>
-        <p>The anchor condition must already be service-connected before you file the secondary. Always file in sequence — anchor first, secondary after.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.310" target="_blank">📄 38 CFR § 3.310 — Full Text (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/about-disability-ratings/after-you-file-your-claim/" target="_blank">🔗 After You File — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 3.307 / 3.309', title: 'Presumptive Service Connection', content: `
-        <p class="reg-intro">For certain conditions and service types, VA presumes service connection — you do not need to prove the link. Filing is enough to trigger the presumption.</p>
+          <li>PTSD → Depression, Sleep Apnea, Substance Use</li>
+          <li>Knee injury → Hip / Back conditions</li>
+          <li>Diabetes → Peripheral neuropathy, eye conditions</li>
+          <li>Hypertension → Heart disease, erectile dysfunction</li>
+        </ul>` },
+      { code: '38 CFR § 3.307/3.309', title: 'Presumptive Service Connection', content: `
+        <p class="reg-intro">For certain conditions and service types, VA presumes service connection — you don't need to prove the link.</p>
         <h3>Key Presumptive Categories</h3>
         <ul class="reg-bullets">
-          <li><strong>PACT Act (2022):</strong> 23+ cancers and respiratory conditions for burn pit/toxic exposure veterans</li>
-          <li><strong>Agent Orange:</strong> 14+ conditions for Vietnam-era veterans including Type 2 diabetes, ischemic heart disease, Parkinson's disease</li>
-          <li><strong>Gulf War Illness:</strong> Undiagnosed chronic conditions for SWA veterans post-8/2/1990 — no specific diagnosis required</li>
-          <li><strong>Camp Lejeune:</strong> 8 conditions for veterans who served 1953–1987 (30+ days)</li>
+          <li><strong>PACT Act (2022):</strong> 23+ cancers and 11 respiratory conditions for burn pit veterans</li>
+          <li><strong>Agent Orange:</strong> 14 conditions for Vietnam-era veterans</li>
+          <li><strong>Gulf War Illness:</strong> Undiagnosed conditions for SWA veterans post-8/2/1990</li>
+          <li><strong>Camp Lejeune:</strong> 8 conditions for veterans who served 1953–1987</li>
           <li><strong>ALS:</strong> Any veteran who served 90+ days active duty</li>
-          <li><strong>POW:</strong> 18+ conditions under § 3.309(c) for former prisoners of war</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.307" target="_blank">📄 38 CFR § 3.307 (eCFR)</a>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.309" target="_blank">📄 38 CFR § 3.309 (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/resources/the-pact-act-and-your-va-benefits/" target="_blank">🔗 PACT Act Overview — va.gov</a>
-          <a class="reg-link" href="https://www.va.gov/disability/eligibility/hazardous-materials-exposure/agent-orange/" target="_blank">🔗 Agent Orange — va.gov</a>
-          <a class="reg-link" href="https://www.va.gov/disability/eligibility/hazardous-materials-exposure/gulf-war-illness/" target="_blank">🔗 Gulf War Illness — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 3.304(f)', title: 'PTSD — Combat & MST Standards', content: `
-        <p class="reg-intro">PTSD has a liberalized evidentiary standard for combat veterans and MST survivors — VA cannot require the same level of corroboration it requires for other conditions.</p>
-        <h3>Combat PTSD — Liberal Standard</h3>
-        <ul class="reg-bullets">
-          <li>If service records confirm combat zone presence or engagement with the enemy, VA must accept your personal statement as evidence of the in-service stressor</li>
-          <li>No requirement to corroborate the specific incident with official records</li>
-          <li>Buddy statements significantly strengthen the claim but are not required</li>
-        </ul>
-        <h3>MST-Related PTSD — Liberalized Standard (§ 3.304(f)(5))</h3>
-        <ul class="reg-bullets">
-          <li>VA does NOT require corroborating evidence of the assault</li>
-          <li>Behavioral changes, performance records, medical records, and personal statements are sufficient</li>
-          <li>VA cannot require service records that document the incident itself</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.304" target="_blank">📄 38 CFR § 3.304 (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/eligibility/mental-health/ptsd/" target="_blank">🔗 PTSD Claims — va.gov</a>
-          <a class="reg-link" href="https://www.mentalhealth.va.gov/msthome/" target="_blank">🔗 MST Resources — va.gov</a>
-        </div>` },
-      { code: 'TERA / PACT Act', title: 'TERA — Toxic Exposure Risk Activity', content: `
-        <p class="reg-intro">TERA covers ANY toxic exposure during military service — at home or abroad. It is completely separate from PACT Act presumptives.</p>
-        <h3>What TERA Covers</h3>
-        <ul class="reg-bullets">
-          <li>Burn pits and open-air waste burning (domestic and overseas)</li>
-          <li>Chemical/biological warfare agents including CBRN training exposures</li>
-          <li>Industrial solvents, pesticides, herbicides</li>
-          <li>Lead, depleted uranium, asbestos</li>
-          <li>AFFF/PFAS firefighting foam</li>
-          <li>Radiation from nuclear testing or occupational exposure</li>
-        </ul>
-        <h3>TERA vs PACT Act — Critical Difference</h3>
-        <ul class="reg-bullets">
-          <li>TERA is NOT automatic presumptive status — you file direct service connection</li>
-          <li>VA must fully consider the documented exposure when evaluating your claim</li>
-          <li>A specialist nexus letter connecting the specific agent to your condition is strongly recommended</li>
-          <li>TERA qualifies veterans for VA health care under the PACT Act, even for CONUS service</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.303" target="_blank">📄 38 CFR § 3.303 — Direct SC (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/resources/toxic-exposure-and-pact-act/" target="_blank">🔗 Toxic Exposure & PACT Act — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 3.102', title: 'Benefit of the Doubt', content: `
-        <p class="reg-intro">When evidence for and against a claim is roughly equal, VA must resolve the issue in the veteran's favor. This is one of the most powerful rules in VA law.</p>
-        <h3>What This Means Practically</h3>
-        <ul class="reg-bullets">
-          <li>You do NOT need to prove your case beyond a reasonable doubt</li>
-          <li>If the C&P examiner says the link is "at least as likely as not," that meets the standard</li>
-          <li>A well-documented claim with a credible nexus letter should be approved even if VA's own examiner is uncertain</li>
-          <li>VA is not a neutral party — they are required by law to help you build your claim</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.102" target="_blank">📄 38 CFR § 3.102 — Full Text (eCFR)</a>
-        </div>` },
+        </ul>` },
     ]
   },
   {
-    group: 'Rating & Compensation',
+    group: 'Rating Schedule',
     items: [
       { code: '38 CFR Part 4', title: 'VA Rating Schedule Overview', content: `
-        <p class="reg-intro">VA rates disabilities 0–100% (in 10% increments) based on symptom severity and impact on daily functioning and earning capacity.</p>
+        <p class="reg-intro">The VA rates disabilities on a scale of 0%, 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, or 100% based on the severity of symptoms.</p>
         <h3>Key Principles</h3>
         <ul class="reg-bullets">
-          <li>Ratings reflect average impairment in earning capacity — not your personal situation</li>
-          <li>The C&P examiner assesses severity — <strong>describe your worst days, not average days</strong></li>
-          <li>A 0% rating means service connection is granted but symptoms do not yet meet the minimum threshold — still valuable for secondary claims and SMC</li>
-          <li>Combined ratings use the whole-person formula — never simple addition</li>
+          <li>Ratings are based on average impairment in earning capacity, not your personal situation</li>
+          <li>The examiner uses a C&P exam to assess severity — your job is to describe your worst days</li>
+          <li>A 0% rating means service connection is granted but symptoms don't meet the minimum threshold</li>
+          <li>Combined ratings use the "VA math" whole-person method — never just add percentages</li>
         </ul>
-        <h3>VA Math Example</h3>
-        <p>50% PTSD + 30% back ≠ 80%. VA math: 50% uses half the person (50 remaining). 30% of 50 = 15 more. Total disability: 65% → rounds to <strong>70%</strong>.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-4" target="_blank">📄 38 CFR Part 4 — Full Rating Schedule (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/about-disability-ratings/" target="_blank">🔗 About VA Disability Ratings — va.gov</a>
-          <a class="reg-link" href="https://www.benefits.va.gov/compensation/resources_comp01.asp" target="_blank">🔗 Combined Ratings Table — va.gov</a>
-        </div>` },
+        <h3>The Benefit of the Doubt Rule</h3>
+        <p>When evidence for and against a claim is approximately equal, VA must resolve the issue in your favor. This is one of the most important principles in VA law.</p>` },
       { code: '38 CFR § 4.96(a)', title: 'Respiratory Conditions — Single Rating Rule', content: `
-        <p class="reg-intro">Veterans with multiple respiratory conditions cannot receive separate combined ratings. VA awards only a single rating — for the most severe (predominant) condition.</p>
+        <p class="reg-intro">Veterans with multiple respiratory conditions cannot receive separate combined ratings for each one. VA awards only a single rating — for the most severe (predominant) condition.</p>
         <h3>How It Works</h3>
         <div class="reg-list">
           <div class="reg-item"><div class="reg-num">1</div><div>VA identifies all service-connected respiratory conditions</div></div>
-          <div class="reg-item"><div class="reg-num">2</div><div>The condition with the <strong>highest rating</strong> becomes the predominant disability</div></div>
-          <div class="reg-item"><div class="reg-num">3</div><div>Only that single rating is awarded — other conditions are bundled, not added separately</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div>The condition with the <strong>highest rating</strong> becomes the "predominant disability"</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div>Only that single rating is awarded — other respiratory conditions are bundled into it, not added</div></div>
         </div>
         <h3>Common Example</h3>
-        <p>Asthma 30% + Sleep Apnea 50% = <strong>50% total</strong> (not 65%). Sleep apnea is predominant; asthma is bundled into it.</p>
+        <p>Asthma at 30% + Sleep Apnea at 50% = <strong>50% total</strong> (not 65% combined). Sleep apnea is predominant; asthma is bundled.</p>
+        <h3>Conditions Subject to § 4.96</h3>
+        <ul class="reg-bullets">
+          <li>Asthma (DC 6602) and Sleep Apnea (DC 6847) — cannot be separately rated</li>
+          <li>COPD, emphysema, bronchitis, bronchiectasis — all bundled with predominant condition</li>
+          <li>Pulmonary fibrosis, interstitial lung disease — same rule applies</li>
+          <li><strong>Exception:</strong> Sinusitis and rhinitis CAN be rated separately from other respiratory conditions</li>
+        </ul>
         <h3>The Urban Exception</h3>
-        <p>Per <em>Urban v. Shulkin</em> (2017): if the bundled condition's symptoms push severity to the next higher rating level of the predominant condition's code, VA must consider elevating the single rating.</p>
-        <h3>Exception to the Rule</h3>
-        <p>Sinusitis and rhinitis CAN be rated separately from other respiratory conditions.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-4/subpart-A/section-4.96" target="_blank">📄 38 CFR § 4.96 (eCFR)</a>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-4/subpart-B/section-4.97" target="_blank">📄 DC 6602 (Asthma) / DC 6847 (Sleep Apnea) — eCFR</a>
-        </div>` },
+        <p>Per <em>Urban v. Shulkin</em> (2017): if symptoms from the non-predominant condition are disabling enough to reach the <strong>next higher rating level</strong> of the predominant condition's diagnostic code, VA must consider elevating the rating. You cannot get two separate ratings, but you may argue for a higher single rating.</p>
+        <h3>Strategy</h3>
+        <ul class="reg-bullets">
+          <li>File for both conditions — having both service-connected is still valuable for SMC and future claims</li>
+          <li>If sleep apnea (50%) is predominant, ask whether your asthma symptoms push you to the 60% or higher criteria under DC 6847</li>
+          <li>Consult an accredited VSO or VA attorney if you believe your combined respiratory disability warrants a higher single rating</li>
+        </ul>` },
       { code: '38 CFR § 4.16', title: 'TDIU — Total Disability (Individual Unemployability)', content: `
-        <p class="reg-intro">TDIU pays at the 100% compensation rate even if your combined rating is below 100%, if your service-connected disabilities prevent substantially gainful employment.</p>
+        <p class="reg-intro">TDIU allows you to receive 100% compensation even if your combined rating is below 100%, if your disabilities prevent substantially gainful employment.</p>
         <h3>Eligibility Thresholds</h3>
         <div class="reg-list">
-          <div class="reg-item"><div class="reg-num">1</div><div>Single disability rated at <strong>60%+</strong> (§ 4.16(a))</div></div>
-          <div class="reg-item"><div class="reg-num">2</div><div>Combined rating <strong>70%+</strong> with at least one disability at 40%+ (§ 4.16(a))</div></div>
-          <div class="reg-item"><div class="reg-num">3</div><div>Extraschedular TDIU (§ 4.16(b)) if unemployable but below above thresholds</div></div>
-        </div>
-        <h3>Key Points</h3>
-        <ul class="reg-bullets">
-          <li>File VA Form 21-8940 (Application for Increased Compensation Based on Unemployability)</li>
-          <li>"Substantially gainful employment" generally means earning above the federal poverty level</li>
-          <li>VA must consider TDIU any time evidence of unemployability is raised, even without explicit claim</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-4/subpart-A/section-4.16" target="_blank">📄 38 CFR § 4.16 (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/find-forms/about-form-21-8940/" target="_blank">🔗 VA Form 21-8940 (TDIU Application)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/eligibility/totally-disabled-individual-unemployability/" target="_blank">🔗 TDIU Overview — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 4.25', title: 'Combined Ratings Formula (VA Math)', content: `
-        <p class="reg-intro">VA combines ratings using the whole-person method — not simple addition. Each rating applies to the remaining non-disabled percentage of the "whole person."</p>
-        <h3>Step-by-Step Formula</h3>
-        <ul class="reg-bullets">
-          <li>Start with 100% whole person. Apply highest rating first.</li>
-          <li>Each subsequent rating is applied to what remains, not the original 100%</li>
-          <li>Final result rounds to nearest 10% (0.5+ rounds up)</li>
-        </ul>
-        <h3>Example: 50% + 30% + 10%</h3>
-        <p>50% of 100 = 50 disabled → 50 remaining | 30% of 50 = 15 disabled → 35 remaining | 10% of 35 = 3.5 disabled | Total: 100 − 31.5 = 68.5% → rounds to <strong>70%</strong>.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-4/subpart-A/section-4.25" target="_blank">📄 38 CFR § 4.25 — Combined Ratings (eCFR)</a>
-          <a class="reg-link" href="https://www.benefits.va.gov/compensation/resources_comp01.asp" target="_blank">🔗 VA Combined Ratings Table — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 3.350', title: 'Special Monthly Compensation (SMC)', content: `
-        <p class="reg-intro">SMC provides additional monthly compensation on top of your regular disability rating for specific severe conditions — even when rated at 0%.</p>
-        <h3>SMC-K (~$130/month) — Most Common</h3>
-        <ul class="reg-bullets">
-          <li>Erectile dysfunction (even at 0% rating) — always file, it unlocks SMC-K automatically</li>
-          <li>Loss of use of a creative organ, loss of use of a hand or foot, blindness in one eye</li>
-        </ul>
-        <h3>Higher SMC Rates</h3>
-        <ul class="reg-bullets">
-          <li><strong>SMC-S (Housebound):</strong> 100% rating + 60%+ additional SC disability, or permanently confined to immediate premises</li>
-          <li><strong>SMC-L (Aid & Attendance):</strong> Requires regular assistance for daily activities</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.350" target="_blank">📄 38 CFR § 3.350 — SMC (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/compensation-rates/special-monthly-compensation-rates/" target="_blank">🔗 SMC Rates — va.gov</a>
+          <div class="reg-item"><div class="reg-num">1</div><div>Single disability rated at 60%+ (§ 4.16(a))</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div>Combined rating of 70%+ with at least one disability at 40% (§ 4.16(a))</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div>Extraschedular TDIU if you don't meet the above but are still unemployable (§ 4.16(b))</div></div>
         </div>` },
     ]
   },
   {
-    group: 'Filing & Process',
+    group: 'Claims Process',
     items: [
-      { code: '38 CFR § 3.155', title: 'Intent to File — Protect Your Date', content: `
-        <p class="reg-intro">An Intent to File (ITF) protects your effective date — the date from which VA calculates retroactive back pay. This is one of the most important and most overlooked steps.</p>
-        <h3>Why It Matters</h3>
-        <ul class="reg-bullets">
-          <li>Filing an ITF today locks your effective date TODAY — not when you finally submit your full claim</li>
-          <li>You have 12 months from your ITF date to submit a complete claim</li>
-          <li>If you miss the 12-month window, file a new ITF and start the clock again</li>
-          <li>Every day you delay without an ITF = potential lost retroactive pay</li>
-        </ul>
-        <h3>How to File (Takes 2 Minutes)</h3>
-        <ul class="reg-bullets">
-          <li>Online at va.gov (fastest — get instant confirmation)</li>
-          <li>By phone: 1-800-827-1000</li>
-          <li>In person at any VA regional office</li>
-          <li>Via an accredited VSO who can file on your behalf</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.155" target="_blank">📄 38 CFR § 3.155 (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/decision-reviews/intent-to-file/" target="_blank">🔗 Intent to File — va.gov</a>
-        </div>` },
-      { code: '38 CFR § 3.400', title: 'Effective Dates — When Back Pay Starts', content: `
-        <p class="reg-intro">The effective date is the date VA uses to calculate retroactive back pay. Getting this right can mean thousands of dollars.</p>
-        <h3>Key Effective Date Rules</h3>
-        <div class="reg-list">
-          <div class="reg-item"><div class="reg-num">1</div><div><strong>Intent to File:</strong> Locks effective date to ITF date — up to 12 months before your full claim</div></div>
-          <div class="reg-item"><div class="reg-num">2</div><div><strong>1-Year Rule:</strong> File within 1 year of discharge and effective date can go back to day after separation</div></div>
-          <div class="reg-item"><div class="reg-num">3</div><div><strong>CUE:</strong> Clear and unmistakable error in a past decision can allow backdating to the original claim date</div></div>
-        </div>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.400" target="_blank">📄 38 CFR § 3.400 — Effective Dates (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/find-forms/about-form-21-526ez/" target="_blank">🔗 VA Form 21-526EZ (Main Claim Form)</a>
-        </div>` },
       { code: '38 CFR § 3.159', title: 'VA Duty to Assist', content: `
-        <p class="reg-intro">VA has a legal duty to help you develop your claim — including obtaining records and scheduling examinations. Filing a claim triggers this duty.</p>
+        <p class="reg-intro">VA has a legal duty to help you develop your claim — including obtaining records and providing examinations.</p>
         <h3>VA Must:</h3>
         <ul class="reg-bullets">
-          <li>Request relevant records from federal agencies (service treatment records, SSA, etc.)</li>
+          <li>Request relevant records from federal agencies (STRs, SSA, etc.)</li>
           <li>Request records from non-federal sources if you give authorization</li>
-          <li>Schedule a C&P exam when one is needed to decide your claim</li>
-          <li>Notify you of what evidence is needed and give you adequate time to respond</li>
-          <li>Fully consider documented TERA toxic exposure when evaluating your claim</li>
-        </ul>
-        <h3>Practical Implication</h3>
-        <p>VA cannot simply deny a plausible claim for lack of evidence — they must help you get the evidence. Filing triggers this duty immediately.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.ecfr.gov/current/title-38/chapter-I/part-3/subpart-A/section-3.159" target="_blank">📄 38 CFR § 3.159 (eCFR)</a>
-          <a class="reg-link" href="https://www.va.gov/disability/how-to-file-claim/" target="_blank">🔗 How to File a Claim — va.gov</a>
-        </div>` },
-      { code: '38 CFR Part 20', title: 'Appeals — Three Lanes', content: `
-        <p class="reg-intro">If VA denies your claim or rates it too low, you have one year from the decision date to appeal. Three lanes are available under the Appeals Modernization Act.</p>
+          <li>Provide a medical examination (C&P exam) when it's needed to decide your claim</li>
+          <li>Notify you of what evidence is needed and give you time to submit it</li>
+        </ul>` },
+      { code: '38 CFR § 20.101', title: 'Appeals — Board of Veterans Appeals', content: `
+        <p class="reg-intro">If VA denies your claim or rates it too low, you have multiple appeal paths.</p>
         <h3>Three Appeal Lanes</h3>
         <div class="reg-list">
-          <div class="reg-item"><div class="reg-num">1</div><div><strong>Supplemental Claim:</strong> Submit new and relevant evidence VA has not yet considered. VA fully re-adjudicates. Best with new nexus letter or medical records.</div></div>
-          <div class="reg-item"><div class="reg-num">2</div><div><strong>Higher-Level Review:</strong> A senior reviewer looks for clear error in the original decision. No new evidence allowed.</div></div>
-          <div class="reg-item"><div class="reg-num">3</div><div><strong>BVA Appeal:</strong> Board of Veterans Appeals. Three tracks: direct review, evidence submission, or in-person/virtual hearing with a judge.</div></div>
-        </div>
-        <h3>Strategy Notes</h3>
-        <ul class="reg-bullets">
-          <li>You can switch lanes — HLR denial then Supplemental Claim with new evidence is a common and effective path</li>
-          <li>BVA hearings are free. An accredited VSO or attorney can represent you at no upfront cost.</li>
-          <li>You have exactly <strong>1 year</strong> from the decision date to appeal — do not let it expire</li>
-          <li>Supplemental Claims have no time limit as long as you have new and relevant evidence</li>
-        </ul>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.va.gov/decision-reviews/" target="_blank">🔗 Decision Reviews & Appeals — va.gov</a>
-          <a class="reg-link" href="https://www.va.gov/decision-reviews/board-appeal/" target="_blank">🔗 BVA Appeal — va.gov</a>
-          <a class="reg-link" href="https://www.va.gov/decision-reviews/higher-level-review/" target="_blank">🔗 Higher-Level Review — va.gov</a>
-          <a class="reg-link" href="https://www.va.gov/decision-reviews/supplemental-claim/" target="_blank">🔗 Supplemental Claim — va.gov</a>
-        </div>` },
-      { code: 'DBQ / C&P Exam', title: 'C&P Exams and DBQs Explained', content: `
-        <p class="reg-intro">The Compensation & Pension exam is one of the most important events in your entire claim. The examiner's written opinion directly drives your rating.</p>
-        <h3>What Happens</h3>
-        <ul class="reg-bullets">
-          <li>A VA or contract examiner (LHI, QTC, VES) reviews your file and physically examines you</li>
-          <li>They complete a Disability Benefits Questionnaire (DBQ) that maps directly to the rating schedule</li>
-          <li>Their opinion on nexus, severity, and functional impairment goes directly to the VA rater</li>
-        </ul>
-        <h3>The Golden Rules</h3>
-        <ul class="reg-bullets">
-          <li><strong>Describe your worst days</strong> — not average days, not your best days</li>
-          <li>Never say "I manage fine" or minimize your symptoms — be precise about limitations</li>
-          <li>Describe impact on work, sleep, relationships, and daily activity in detail</li>
-          <li>Request a copy of your DBQ within 30 days — review for errors, which are common and appealable</li>
-          <li>If the exam was inadequate, request a new one or submit a private IMO to rebut it</li>
-        </ul>
-        <h3>Private DBQs</h3>
-        <p>You can have your own doctor complete a DBQ before your C&P and submit it as evidence. This often results in higher ratings because your own physician knows your history.</p>
-        <div class="reg-sources">
-          <div class="reg-sources-title">Official Sources</div>
-          <a class="reg-link" href="https://www.va.gov/disability/va-claim-exam/" target="_blank">🔗 About C&P Exams — va.gov</a>
-          <a class="reg-link" href="https://www.benefits.va.gov/compensation/dbq_publicdbqs.asp" target="_blank">🔗 All DBQ Forms — va.gov</a>
+          <div class="reg-item"><div class="reg-num">1</div><div><strong>Supplemental Claim:</strong> Submit new and relevant evidence. VA re-adjudicates.</div></div>
+          <div class="reg-item"><div class="reg-num">2</div><div><strong>Higher-Level Review:</strong> Senior reviewer looks for clear error in the original decision.</div></div>
+          <div class="reg-item"><div class="reg-num">3</div><div><strong>BVA Appeal:</strong> Board of Veterans Appeals. Choose direct review, evidence submission, or hearing.</div></div>
         </div>` },
     ]
   }
 ];
-
 
 function buildRegsTree() {
   const tree = document.getElementById('regsTree');
@@ -3076,7 +2827,7 @@ function showReg(gi, ii) {
   document.querySelectorAll('.tree-item')[gi * 10 + ii]?.classList.add('active');
   document.getElementById('regsTitle').textContent = item.title;
   document.getElementById('regsCode').textContent = item.code;
-  document.getElementById('regsBody').innerHTML = item.content || '';
+  document.getElementById('regsBody').innerHTML = item.content;
 }
 
 function filterRegs(q) {
@@ -3118,12 +2869,12 @@ function showLandingMoment(data) {
   overlay.innerHTML = `
     <div style="max-width:560px;text-align:center;color:#fff">
       <div style="font-size:56px;margin-bottom:16px">🎯</div>
-      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;margin-bottom:12px">Your Roadmap Is Ready</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;margin-bottom:12px">Your Personalized Blueprint Is Ready</div>
       <div style="font-size:28px;font-weight:700;font-family:'Oswald',sans-serif;margin-bottom:16px">${condCount} Potential Claim${condCount !== 1 ? 's' : ''} Identified</div>
       <div style="font-size:15px;color:rgba(255,255,255,0.8);line-height:1.6;margin-bottom:14px">${data.summary || ''}</div>
       ${pathwayLabel ? `<div style="display:inline-block;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#C9A84C;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:20px">${pathwayLabel}</div>` : ''}
       <div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:28px;padding:0 8px">
-        What you shared matters. These conditions reflect your specific service history — not a generic checklist. The options shown are yours to decide. Review each condition carefully and use Ask Aylene for guidance at any point.
+        What you shared matters. These conditions reflect your specific legal position — not a generic checklist. The options shown are yours to decide. Review each condition carefully and use Ask Aylene for guidance at any point.
       </div>
       <button onclick="closeLandingMoment()" style="background:#C9A84C;color:#002855;border:none;padding:14px 40px;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:.04em">View My Roadmap →</button>
     </div>`;
@@ -3620,19 +3371,14 @@ function stopC101Carousel() {
 
 // ── CLAUDE API ──
 async function callClaude(messages, maxTokens = 800, system = '', retries = 3) {
-  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 4000), messages };
+  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 3000), messages };
   if (system) body.system = system;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/.netlify/functions/claude', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
