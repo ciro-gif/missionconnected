@@ -1632,128 +1632,36 @@ body{font-family:var(--font-body);background:var(--white);color:var(--text);line
   transition: width 0.05s linear;
 }
 
-/* ══════════════════════════════════════════════
-   NEW SECTIONS — Filing Strategy, Secondary AI,
-   Reg Sources, Source Links
-══════════════════════════════════════════════ */
-
 /* ── FILING STRATEGY SECTION ── */
-.filing-strategy-section {
-  background: var(--navy);
-  border-radius: 10px;
-  padding: 0;
-  margin-bottom: 20px;
-  overflow: hidden;
-}
-.fs-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
-}
-.fs-icon { font-size: 22px; flex-shrink: 0; }
-.fs-title { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: .02em; }
-.fs-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
-.fs-steps { padding: 8px 16px 14px; display: flex; flex-direction: column; gap: 6px; }
-.fs-step {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  padding: 10px 4px;
-}
-.fs-step:last-child { border-bottom: none; }
-.fs-step-num {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--navy);
-  background: var(--gold);
-  border-radius: 3px;
-  padding: 2px 7px;
-  flex-shrink: 0;
-  margin-top: 2px;
-  white-space: nowrap;
-  letter-spacing: .3px;
-}
-.fs-step-body { font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.55; }
-.fs-step-plain { font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.55; }
+.filing-strategy-section{background:var(--navy);border-radius:10px;margin-bottom:20px;overflow:hidden;}
+.fs-header{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.12);}
+.fs-icon{font-size:20px;flex-shrink:0;}
+.fs-title{font-size:14px;font-weight:700;color:#fff;}
+.fs-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;}
+.fs-steps{padding:8px 18px 14px;display:flex;flex-direction:column;gap:0;}
+.fs-step{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.07);}
+.fs-step:last-child{border-bottom:none;}
+.fs-step-num{font-size:10px;font-weight:800;color:var(--navy);background:var(--gold);border-radius:3px;padding:2px 7px;flex-shrink:0;margin-top:2px;white-space:nowrap;}
+.fs-step-body{font-size:13px;color:rgba(255,255,255,.85);line-height:1.55;}
 
-/* ── SECONDARY AI OPPORTUNITIES SECTION ── */
-.secondary-ai-section {
-  background: linear-gradient(135deg, #1a1a3e 0%, #0d1b3e 100%);
-  border: 1px solid rgba(201,168,76,.3);
-  border-radius: 10px;
-  padding: 0;
-  margin: 20px 0;
-  overflow: hidden;
-}
-.sas-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255,255,255,.1);
-}
-.sas-icon { font-size: 24px; margin-top: 2px; flex-shrink: 0; }
-.sas-title { font-size: 15px; font-weight: 700; color: #C9A84C; }
-.sas-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 3px; line-height: 1.5; }
-.sas-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 20px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
-}
-.sas-item:last-of-type { border-bottom: none; }
-.sas-item-left { flex: 1; min-width: 0; }
-.sas-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 5px; }
-.sas-tag {
-  font-size: 10px;
-  background: rgba(0,118,206,.25);
-  color: #7DD3FC;
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-weight: 500;
-  margin-left: 6px;
-}
-.sas-rationale { font-size: 12px; color: rgba(255,255,255,.65); line-height: 1.55; margin-bottom: 5px; }
-.sas-rating { font-size: 11px; color: var(--gold); font-weight: 600; }
-.sas-footer {
-  font-size: 11px;
-  color: rgba(255,255,255,.4);
-  padding: 10px 20px;
-  border-top: 1px solid rgba(255,255,255,.08);
-}
+/* ── SECONDARY AI OPPORTUNITIES ── */
+.secondary-ai-section{background:linear-gradient(135deg,#1a1a3e 0%,#0d1b3e 100%);border:1px solid rgba(201,168,76,.3);border-radius:10px;margin:20px 0;overflow:hidden;}
+.sas-header{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);}
+.sas-icon{font-size:22px;flex-shrink:0;}
+.sas-title{font-size:14px;font-weight:700;color:#C9A84C;}
+.sas-sub{font-size:12px;color:rgba(255,255,255,.5);margin-top:3px;line-height:1.5;}
+.sas-item{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.06);}
+.sas-item:last-of-type{border-bottom:none;}
+.sas-item-left{flex:1;min-width:0;}
+.sas-name{font-size:13px;font-weight:600;color:#fff;margin-bottom:4px;}
+.sas-tag{font-size:10px;background:rgba(0,118,206,.25);color:#7DD3FC;padding:1px 6px;border-radius:10px;font-weight:500;margin-left:5px;}
+.sas-rationale{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:4px;}
+.sas-rating{font-size:11px;color:var(--gold);font-weight:600;}
+.sas-footer{font-size:11px;color:rgba(255,255,255,.35);padding:8px 18px;border-top:1px solid rgba(255,255,255,.06);}
 
-/* ── VA REGULATIONS — Source Links ── */
-.reg-sources {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.reg-sources-title {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--text-hint);
-  margin-bottom: 8px;
-}
-.reg-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--sky);
-  text-decoration: none;
-  padding: 7px 10px;
-  border: 1px solid rgba(0,118,206,.2);
-  border-radius: 6px;
-  background: rgba(0,118,206,.04);
-  margin-bottom: 6px;
-  transition: background .15s;
-}
-.reg-link:last-child { margin-bottom: 0; }
-.reg-link:hover { background: rgba(0,118,206,.1); color: var(--navy); }
+/* ── REG SOURCES ── */
+.reg-sources{margin-top:16px;padding-top:12px;border-top:1px solid var(--border);}
+.reg-sources-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-hint);margin-bottom:8px;}
+.reg-link{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sky);text-decoration:none;padding:6px 10px;border:1px solid rgba(0,118,206,.2);border-radius:6px;background:rgba(0,118,206,.04);margin-bottom:6px;transition:background .15s;}
+.reg-link:last-child{margin-bottom:0;}
+.reg-link:hover{background:rgba(0,118,206,.1);}
