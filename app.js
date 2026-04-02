@@ -1365,7 +1365,7 @@ RETURN THIS JSON STRUCTURE (minified):
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 4000);
+    const data = await callClaude([{role:'user',content:prompt}], 2800);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
