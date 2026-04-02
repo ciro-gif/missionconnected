@@ -1,6 +1,12 @@
 [build]
   functions = "netlify/functions"
 
+[functions]
+  timeout = 26
+
+[functions."claude"]
+  timeout = 26
+
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
