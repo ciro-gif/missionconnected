@@ -11,96 +11,202 @@
 
 <!-- LANDING -->
 <div id="vLanding" class="view active">
-  <nav class="l-nav">
-    <div class="l-nav-logo" onclick="showView('vLanding')">
-      <div class="l-nav-badge">M:C</div>
-      <div class="l-nav-name">Mission: Connected</div>
+
+  <!-- ── NAV ── -->
+  <nav class="ln-nav">
+    <div class="ln-logo" onclick="showView('vLanding')">
+      <div class="ln-badge">M:C</div>
+      <div class="ln-name">Mission: Connected</div>
     </div>
-    <div class="l-nav-right">
-      <button class="btn-nav-signin" onclick="openAuth('signin')">Sign In</button>
-      <button class="btn-nav-start" onclick="startScreener()">Free Screening →</button>
-      <button class="btn-dev-skip" onclick="devFillScreener()" title="DEV: Auto-fill test profile &amp; build roadmap">⚡ Dev Test</button>
+    <div class="ln-right">
+      <button class="ln-signin" onclick="openAuth('signin')">Sign In</button>
+      <button class="ln-start" onclick="startScreener()">Free Screening →</button>
     </div>
   </nav>
 
-  <section class="l-hero">
-    <div class="l-hero-bg">
-      <img class="l-hero-img l-hero-img-1" src="https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=800&q=70&auto=format" alt="Veteran" loading="eager">
-      <img class="l-hero-img l-hero-img-2" src="https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=800&q=70&auto=format" alt="Consultation" loading="eager">
-      <img class="l-hero-img l-hero-img-3" src="https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800&q=70&auto=format" alt="Veterans" loading="eager">
-    </div>
-    <div class="l-hero-inner">
-      <div class="l-hero-tag">🎖️ Free for Every Veteran — Always</div>
-      <h1>Your VA Benefits.<br><span>Understood. Finally.</span></h1>
-      <p class="l-hero-sub">Answer a few questions about your service and we'll build you a personalized VA disability roadmap — with the conditions you're eligible for, the evidence you need, and a clear plan to file and win.</p>
-      <div class="l-hero-ctas">
-        <button class="btn-hero-primary" onclick="startScreener()">Start Your Free Screening →</button>
-        <button class="btn-hero-secondary" onclick="openAuth('signin')">Sign In to My Account</button>
+  <!-- ── HERO ── -->
+  <section class="ln-hero">
+    <div class="ln-hero-noise"></div>
+    <div class="ln-hero-glow"></div>
+    <div class="ln-hero-content">
+      <div class="ln-eyebrow">🎖️ Built by a veteran &nbsp;·&nbsp; Free for every veteran, always</div>
+      <h1 class="ln-h1">
+        The VA system is<br>
+        <em class="ln-h1-accent">designed to confuse you.</em>
+      </h1>
+      <p class="ln-h1-sub">We're not.</p>
+      <p class="ln-hero-body">Answer 15 questions about your service. We build a personalized disability roadmap — conditions you qualify for, evidence you need, and a step-by-step filing strategy.</p>
+      <div class="ln-hero-ctas">
+        <button class="ln-btn-gold" onclick="startScreener()">Start Free Screening — 5 min →</button>
+        <button class="ln-btn-ghost" onclick="openAuth('signin')">Sign In</button>
       </div>
-      <p class="l-hero-note">🔒 No account required · No signup · Takes 5 minutes</p>
+      <div class="ln-trust-row">
+        <span>🔒 No account required</span>
+        <span class="ln-trust-dot">·</span>
+        <span>No signup</span>
+        <span class="ln-trust-dot">·</span>
+        <span>100% free forever</span>
+      </div>
+    </div>
+    <div class="ln-hero-card-wrap">
+      <div class="ln-roadmap-card">
+        <div class="lrc-header">
+          <div class="lrc-dot"></div>
+          <span class="lrc-title">MY CLAIM ROADMAP</span>
+          <span class="lrc-chip">7 conditions</span>
+        </div>
+        <div class="lrc-cond lrc-direct">
+          <div class="lrc-bar"></div>
+          <div class="lrc-info">
+            <div class="lrc-name">PTSD</div>
+            <div class="lrc-meta">Direct Service · Target 70%</div>
+          </div>
+          <div class="lrc-badge high">HIGH</div>
+        </div>
+        <div class="lrc-cond lrc-presumptive">
+          <div class="lrc-bar"></div>
+          <div class="lrc-info">
+            <div class="lrc-name">Constrictive Bronchiolitis</div>
+            <div class="lrc-meta">PACT Act · No nexus needed</div>
+          </div>
+          <div class="lrc-badge high">HIGH</div>
+        </div>
+        <div class="lrc-cond lrc-direct">
+          <div class="lrc-bar"></div>
+          <div class="lrc-info">
+            <div class="lrc-name">Tinnitus</div>
+            <div class="lrc-meta">Direct Service · 10%</div>
+          </div>
+          <div class="lrc-badge med">MED</div>
+        </div>
+        <div class="lrc-cond lrc-secondary">
+          <div class="lrc-bar"></div>
+          <div class="lrc-info">
+            <div class="lrc-name">Sleep Apnea</div>
+            <div class="lrc-meta">Secondary to PTSD · 50%</div>
+          </div>
+          <div class="lrc-badge med">MED</div>
+        </div>
+        <div class="lrc-footer">
+          <div>
+            <div class="lrc-footer-label">Est. Combined Rating</div>
+            <div class="lrc-footer-val">80–90%</div>
+          </div>
+          <div style="text-align:right">
+            <div class="lrc-footer-label">Monthly (tax-free)</div>
+            <div class="lrc-footer-pay">~$2,044–$2,298</div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <div class="l-trust">
-    <div class="l-trust-item"><em>✅</em> Free Forever</div>
-    <div class="l-trust-item"><em>🎯</em> MOS Intelligence</div>
-    <div class="l-trust-item"><em>🗺️</em> Personalized Roadmap</div>
-    <div class="l-trust-item"><em>🤖</em> AI Powered</div>
-    <div class="l-trust-item"><em>📊</em> Case Dashboard</div>
-    <div class="l-trust-item"><em>📖</em> 38 CFR Plain Language</div>
+  <!-- ── STATS ── -->
+  <div class="ln-stats">
+    <div class="ln-stat">
+      <div class="ln-stat-n">50<span>+</span></div>
+      <div class="ln-stat-l">Conditions Mapped</div>
+    </div>
+    <div class="ln-stat-sep"></div>
+    <div class="ln-stat">
+      <div class="ln-stat-n">5<span>min</span></div>
+      <div class="ln-stat-l">To Your Roadmap</div>
+    </div>
+    <div class="ln-stat-sep"></div>
+    <div class="ln-stat">
+      <div class="ln-stat-n">$3,737<span>/mo</span></div>
+      <div class="ln-stat-l">Max 100% Benefit</div>
+    </div>
+    <div class="ln-stat-sep"></div>
+    <div class="ln-stat">
+      <div class="ln-stat-n">$0<span>cost</span></div>
+      <div class="ln-stat-l">Always Free</div>
+    </div>
   </div>
 
-  <section class="l-section l-how">
-    <div class="l-section-inner">
-      <div class="l-section-tag">The Process</div>
-      <div class="l-section-title">Three Steps to Your Roadmap</div>
-      <div class="l-section-sub">From screening to a complete, actionable claim strategy in minutes.</div>
-      <div class="l-steps">
-        <div class="l-step">
-          <div class="l-step-num">1</div>
-          <div class="l-step-title">Answer the Screener</div>
-          <p class="l-step-desc">Branch, MOS, deployments, exposures, and symptoms. Every answer shapes your roadmap. Takes about 5 minutes.</p>
+  <!-- ── PROCESS ── -->
+  <section class="ln-section ln-dark">
+    <div class="ln-inner">
+      <div class="ln-label">THE MISSION</div>
+      <h2 class="ln-h2">Three steps.<br><span style="color:var(--gold)">One complete claim strategy.</span></h2>
+      <div class="ln-steps">
+        <div class="ln-step">
+          <div class="ln-step-n">01</div>
+          <div class="ln-step-line"></div>
+          <div class="ln-step-body">
+            <div class="ln-step-title">Answer the Screener</div>
+            <p class="ln-step-desc">Branch, MOS, deployments, exposures, symptoms. 15 questions. Every answer sharpens your roadmap with your specific service history — not a generic checklist.</p>
+          </div>
         </div>
-        <div class="l-step">
-          <div class="l-step-num">2</div>
-          <div class="l-step-title">Get Your Roadmap</div>
-          <p class="l-step-desc">AI builds a personalized claim blueprint — conditions, evidence needed, VA rating criteria, and a prioritized action plan.</p>
+        <div class="ln-step">
+          <div class="ln-step-n">02</div>
+          <div class="ln-step-line"></div>
+          <div class="ln-step-body">
+            <div class="ln-step-title">Get Your Roadmap</div>
+            <p class="ln-step-desc">AI builds a personalized claim blueprint — conditions you qualify for, evidence needed, official VA rating criteria, and a prioritized 5-step filing sequence.</p>
+          </div>
         </div>
-        <div class="l-step">
-          <div class="l-step-num">3</div>
-          <div class="l-step-title">Take Action</div>
-          <p class="l-step-desc">Free account to save your roadmap, chat with Aylene, track your case, and store your records securely.</p>
+        <div class="ln-step">
+          <div class="ln-step-n">03</div>
+          <div class="ln-step-line last"></div>
+          <div class="ln-step-body">
+            <div class="ln-step-title">File and Win</div>
+            <p class="ln-step-desc">Track every condition from planning to won. Chat with Aylene. Upload your records. Know your rights. Nothing gets missed, nothing gets left on the table.</p>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="l-section">
-    <div class="l-section-inner">
-      <div class="l-section-tag">What You Get</div>
-      <div class="l-section-title">Everything You Need. Nothing You Don't.</div>
-      <div class="l-feat-grid">
-        <div class="l-feat-card"><div class="l-feat-icon">🎯</div><div class="l-feat-title">MOS Intelligence</div><p class="l-feat-desc">Your job tells us your exposures, noise levels, TERA status, and which conditions veterans in your specialty claim most.</p></div>
-        <div class="l-feat-card"><div class="l-feat-icon">🗺️</div><div class="l-feat-title">Personalized Roadmap</div><p class="l-feat-desc">Color-coded claim blueprint with official VA rating criteria, evidence checklists, and a next action for every condition.</p></div>
-        <div class="l-feat-card"><div class="l-feat-icon">💬</div><div class="l-feat-title">Aylene — AI Advisor</div><p class="l-feat-desc">Your personal claims guide. Warm, knowledgeable, veteran-focused. Ask anything about nexus letters, C&P prep, TDIU, and more.</p></div>
-        <div class="l-feat-card"><div class="l-feat-icon">📊</div><div class="l-feat-title">Case Dashboard</div><p class="l-feat-desc">Kanban-style board tracking every condition from planning to won. Step-by-step checklists and combined rating gauge.</p></div>
-        <div class="l-feat-card"><div class="l-feat-icon">📄</div><div class="l-feat-title">Decision Letter Analysis</div><p class="l-feat-desc">Upload a denial and the AI finds exactly what favorable findings VA already conceded — and what would flip the outcome.</p></div>
-        <div class="l-feat-card"><div class="l-feat-icon">📖</div><div class="l-feat-title">38 CFR Plain Language</div><p class="l-feat-desc">Full VA regulation library anyone can understand. Know your rights before your next VA appointment.</p></div>
+  <!-- ── FEATURES ── -->
+  <section class="ln-section ln-mid">
+    <div class="ln-inner">
+      <div class="ln-label">WHAT YOU GET</div>
+      <h2 class="ln-h2">Every tool a veteran needs.<br><span style="color:var(--gold)">Nothing behind a paywall.</span></h2>
+      <div class="ln-feat-grid">
+        <div class="ln-feat">
+          <div class="ln-feat-ico">🎯</div>
+          <div class="ln-feat-title">MOS Intelligence</div>
+          <p class="ln-feat-desc">Your job tells us your exposures, noise levels, TERA status, and which conditions veterans in your specialty claim most.</p>
+        </div>
+        <div class="ln-feat">
+          <div class="ln-feat-ico">🗺️</div>
+          <div class="ln-feat-title">Personalized Roadmap</div>
+          <p class="ln-feat-desc">Color-coded claim blueprint with official VA rating criteria, evidence checklists, and a next action for every condition.</p>
+        </div>
+        <div class="ln-feat">
+          <div class="ln-feat-ico">💬</div>
+          <div class="ln-feat-title">Aylene — AI Advisor</div>
+          <p class="ln-feat-desc">Your personal claims guide. Warm, direct, veteran-focused. Ask anything about nexus letters, C&amp;P prep, TDIU, and more.</p>
+        </div>
+        <div class="ln-feat">
+          <div class="ln-feat-ico">📊</div>
+          <div class="ln-feat-title">Case Dashboard</div>
+          <p class="ln-feat-desc">Kanban board tracking every condition from planning to won. Combined rating gauge that updates in real time.</p>
+        </div>
+        <div class="ln-feat">
+          <div class="ln-feat-ico">📄</div>
+          <div class="ln-feat-title">Decision Letter Analysis</div>
+          <p class="ln-feat-desc">Upload a denial and the AI finds exactly what VA already conceded — and what evidence would flip the outcome.</p>
+        </div>
+        <div class="ln-feat">
+          <div class="ln-feat-ico">📖</div>
+          <div class="ln-feat-title">38 CFR Plain Language</div>
+          <p class="ln-feat-desc">Full VA regulation library in plain English. Know your rights — duty to assist, secondary claims, TDIU — before your next appointment.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="l-section l-calc">
-    <div class="l-section-inner">
-      <div class="l-section-tag">VA Compensation</div>
-      <div class="l-section-title">See What You Could Be Receiving</div>
-      <div class="l-section-sub">2025 VA monthly compensation rates — tax free. Use the combined rating calculator to see how multiple conditions add up using the official VA whole-person method.</div>
-      <div class="calc-tabs">
+  <!-- ── CALCULATOR ── -->
+  <section class="ln-section ln-dark">
+    <div class="ln-inner">
+      <div class="ln-label">VA COMPENSATION</div>
+      <h2 class="ln-h2">See what you could<br>be receiving — <span style="color:var(--gold)">tax free.</span></h2>
+      <div class="calc-tabs" style="margin-bottom:0">
         <div class="calc-tab active" id="ctab-single" onclick="switchCalcTab('single')">Monthly Rate Lookup</div>
         <div class="calc-tab" id="ctab-multi" onclick="switchCalcTab('multi')">Combined Rating Calculator</div>
       </div>
-
-      <!-- SINGLE RATING -->
       <div class="calc-widget" id="calcSingle">
         <div class="calc-row">
           <div>
@@ -137,114 +243,51 @@
             <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px">Federal &amp; State</div>
           </div>
         </div>
-        <p class="calc-note">Rates shown are 2025 VA compensation. Verify current rates at <a href="https://www.va.gov/disability/compensation-rates/" target="_blank">VA.gov</a>.</p>
+        <p class="calc-note">2025 VA compensation rates. Verify at <a href="https://www.va.gov/disability/compensation-rates/" target="_blank">VA.gov</a>.</p>
       </div>
-
-      <!-- COMBINED RATING CALCULATOR -->
       <div class="calc-widget" id="calcMulti" style="display:none">
-        <div class="calc-multi-info">⚙️ <strong>How VA math works:</strong> VA does NOT add percentages. Each condition is applied to your remaining "whole person." A veteran with 50% PTSD and 30% back — VA math gives 65%, not 80%.</div>
+        <div class="calc-multi-info">⚙️ <strong>VA math:</strong> VA does NOT add percentages. Each condition is applied to your remaining "whole person." 50% PTSD + 30% back = 65%, not 80%.</div>
         <div id="multiRatingInputs">
           <div class="multi-rating-row"><input class="multi-rating-input calc-select" type="number" min="0" max="100" placeholder="Rating %" oninput="updateMultiCalc()"><span class="multi-rating-label">Condition 1</span><button class="btn-remove-rating" onclick="removeRatingRow(this)">✕</button></div>
           <div class="multi-rating-row"><input class="multi-rating-input calc-select" type="number" min="0" max="100" placeholder="Rating %" oninput="updateMultiCalc()"><span class="multi-rating-label">Condition 2</span><button class="btn-remove-rating" onclick="removeRatingRow(this)">✕</button></div>
         </div>
         <button class="btn-add-rating" onclick="addRatingRow()">＋ Add Condition</button>
         <div id="multiCalcResult"></div>
-        <p class="calc-note">This is the official VA whole-person combined rating formula per 38 CFR Part 4.</p>
+        <p class="calc-note">Official VA whole-person combined rating formula — 38 CFR Part 4.</p>
       </div>
     </div>
   </section>
 
-  <section class="l-section l-preview-section">
-    <div class="l-section-inner">
-      <div class="l-section-tag">What It Looks Like</div>
-      <div class="l-section-title">Your Command Center — Built Around You</div>
-      <div class="l-section-sub">Once you complete the screener, you get a full personalized dashboard. Here's a preview of what one veteran's claim roadmap looks like.</div>
-      <div class="l-preview-wrap">
-        <!-- MOCK TOPBAR -->
-        <div class="preview-topbar">
-          <div class="preview-logo"><span class="preview-badge">M:C</span> Mission: Connected</div>
-          <div class="preview-tb-right"><span class="preview-ai-dot"></span> AI Ready &nbsp;·&nbsp; <span style="color:#C9A84C">★ J. Martinez, Army</span></div>
-        </div>
-        <div class="preview-layout">
-          <!-- MOCK SIDEBAR -->
-          <div class="preview-sidebar">
-            <div class="preview-nav-item active">🗺️ My Roadmap</div>
-            <div class="preview-nav-item">📊 Dashboard</div>
-            <div class="preview-nav-item">💬 Ask Aylene</div>
-            <div class="preview-nav-item">📋 Tracker</div>
-            <div class="preview-nav-item">📁 Records</div>
-          </div>
-          <!-- MOCK CONTENT -->
-          <div class="preview-content">
-            <div class="preview-hero-banner">
-              <div>
-                <div class="preview-hero-title">🎯 7 Conditions Identified</div>
-                <div class="preview-hero-sub">Army · 11B Infantryman · OIF/OEF · Burn Pit Exposure</div>
-              </div>
-              <div class="preview-rating-chip">Est. 80–90% Combined</div>
-            </div>
-            <div class="preview-cond-list">
-              <div class="preview-cond-card border-direct">
-                <div class="preview-cond-name">PTSD</div>
-                <span class="preview-badge-type direct">Direct</span>
-                <span class="preview-prio high">HIGH</span>
-                <div class="preview-cond-action">📝 Get nexus letter → Rate 70%</div>
-              </div>
-              <div class="preview-cond-card border-presumptive">
-                <div class="preview-cond-name">Constrictive Bronchiolitis</div>
-                <span class="preview-badge-type presumptive">Presumptive</span>
-                <span class="preview-prio high">HIGH</span>
-                <div class="preview-cond-action">⚗️ PACT Act — No nexus needed</div>
-              </div>
-              <div class="preview-cond-card border-direct">
-                <div class="preview-cond-name">Tinnitus</div>
-                <span class="preview-badge-type direct">Direct</span>
-                <span class="preview-prio medium">MED</span>
-                <div class="preview-cond-action">📋 Lay statement sufficient</div>
-              </div>
-              <div class="preview-cond-card border-secondary">
-                <div class="preview-cond-name">Sleep Apnea</div>
-                <span class="preview-badge-type secondary">Secondary</span>
-                <span class="preview-prio medium">MED</span>
-                <div class="preview-cond-action">↳ Secondary to PTSD</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="preview-blur-overlay">
-          <button class="btn-hero-primary" onclick="startScreener()" style="font-size:14px;padding:12px 28px">Get Your Personalized Roadmap →</button>
-          <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:10px">Free · 5 minutes · No account required</div>
-        </div>
-      </div>
+  <!-- ── MANIFESTO ── -->
+  <section class="ln-manifesto">
+    <div class="ln-manifesto-inner">
+      <div class="ln-manifesto-rule"></div>
+      <blockquote class="ln-manifesto-q">
+        "The information veterans need to claim what they've earned has always existed. Every veteran deserves access to it — clearly, completely, at no cost.<br><span class="ln-manifesto-accent">Not charity. Right.</span>"
+      </blockquote>
+      <div class="ln-manifesto-attr">— Founder, Mission: Connected · U.S. Army Reserve · 74D CBRN · 2015–2023</div>
+      <div class="ln-free-pill">✅ Free for Every Veteran. Forever. No exceptions.</div>
     </div>
   </section>
 
-  <section class="l-section l-manifesto">
-    <div class="l-section-inner">
-      <div class="l-manifesto-inner">
-        <div class="l-section-tag" style="text-align:center;margin-bottom:24px">Our Mission</div>
-        <p class="l-manifesto-quote">"The information veterans need to claim what they've earned has always existed. Every veteran deserves access to it — clearly, completely, at no cost. Not charity. Right."</p>
-        <div class="l-manifesto-attr">— Founder, Mission: Connected · U.S. Army Veteran</div>
-        <div><div class="l-free-badge">✅ Free for Every Veteran. Forever. No exceptions.</div></div>
-      </div>
-    </div>
+  <!-- ── CTA ── -->
+  <section class="ln-cta">
+    <div class="ln-cta-label">GET STARTED</div>
+    <h2 class="ln-cta-h2">Your roadmap<br>is <span class="ln-cta-accent">waiting.</span></h2>
+    <p class="ln-cta-sub">5 minutes. No signup. No cost. Just answers.</p>
+    <button class="ln-btn-gold ln-btn-xl" onclick="startScreener()">Start Your Free Screening →</button>
   </section>
 
-  <section class="l-cta-section">
-    <div class="l-section-tag" style="color:var(--gold);margin-bottom:14px">Get Started</div>
-    <h2 class="l-cta-title">Your Roadmap is Waiting.</h2>
-    <p class="l-cta-sub">5 minutes. No signup. No cost. Just answers.</p>
-    <button class="btn-hero-primary" onclick="startScreener()" style="font-size:16px;padding:16px 40px">Start Your Free Screening →</button>
-  </section>
-
-  <footer class="l-footer">
-    <div class="l-footer-logo">⭐ MISSION: CONNECTED</div>
-    <p class="l-footer-disc">Educational guidance only. Not legal advice. Not affiliated with the U.S. Department of Veterans Affairs. For formal proceedings consult an accredited VA attorney or VSO.</p>
-    <div class="l-footer-links">
-      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#0b787b64657864794b66627878626465686465656e687f6e6f257d6e7f">Become a Sponsor</a>
-      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#6b030e0707042b06021818020405080405050e081f0e0f451d0e1f">Contact</a>
+  <!-- ── FOOTER ── -->
+  <footer class="ln-footer">
+    <div class="ln-footer-logo">⭐ MISSION: CONNECTED</div>
+    <p class="ln-footer-disc">Independent educational tool built by veterans, for veterans. Not affiliated with the U.S. Department of Veterans Affairs. Consult an accredited VSO or VA attorney for formal claim representation.</p>
+    <div class="ln-footer-links">
+      <a class="ln-footer-link" href="mailto:hello@missionconnected.vet">Become a Sponsor</a>
+      <a class="ln-footer-link" href="mailto:hello@missionconnected.vet">Contact</a>
     </div>
   </footer>
+
 </div>
 
 <!-- AUTH MODAL -->
@@ -355,7 +398,7 @@
       <h4 style="margin:16px 0 6px">Data Security</h4>
       <p>All data is encrypted in transit and at rest via Supabase infrastructure. Passwords are hashed and never stored in plain text.</p>
       <h4 style="margin:16px 0 6px">Your Rights</h4>
-      <p>You may request deletion of your account and all associated data at any time by emailing <a href="/cdn-cgi/l/email-protection#d9b1bcb5b5b699b4b0aaaab0b6b7bab6b7b7bcbaadbcbdf7afbcad"><span class="__cf_email__" data-cfemail="8ce4e9e0e0e3cce1e5ffffe5e3e2efe3e2e2e9eff8e9e8a2fae9f8">[email&#160;protected]</span></a>.</p>
+      <p>You may request deletion of your account and all associated data at any time by emailing <a href="/cdn-cgi/l/email-protection#81e9e4ededeec1ece8f2f2e8eeefe2eeefefe4e2f5e4e5aff7e4f5"><span class="__cf_email__" data-cfemail="7d15181111123d10140e0e1412131e121313181e091819530b1809">[email&#160;protected]</span></a>.</p>
       <h4 style="margin:16px 0 6px">No Third-Party Sharing</h4>
       <p>We do not share your data with the VA, insurance companies, attorneys, advertisers, or any other third party. Period.</p>
       <p style="margin-top:16px;color:#9CA3AF;font-size:12px">Last updated: March 2026</p>
