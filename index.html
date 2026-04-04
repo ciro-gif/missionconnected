@@ -19,6 +19,7 @@
     <div class="l-nav-right">
       <button class="btn-nav-signin" onclick="openAuth('signin')">Sign In</button>
       <button class="btn-nav-start" onclick="startScreener()">Free Screening →</button>
+      <button class="btn-dev-skip" onclick="devFillScreener()" title="DEV: Auto-fill test profile &amp; build roadmap">⚡ Dev Test</button>
     </div>
   </nav>
 
@@ -238,10 +239,10 @@
 
   <footer class="l-footer">
     <div class="l-footer-logo">⭐ MISSION: CONNECTED</div>
-    <p class="l-footer-disc">Independent educational tool built by veterans, for veterans. Not affiliated with the VA. Consult an accredited VSO or VA attorney for formal claim representation.</p>
+    <p class="l-footer-disc">Educational guidance only. Not legal advice. Not affiliated with the U.S. Department of Veterans Affairs. For formal proceedings consult an accredited VA attorney or VSO.</p>
     <div class="l-footer-links">
-      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#0774776869746875476a6e74746e686964686969626473626329716273">Become a Sponsor</a>
-      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#bbd3ded7d7d4fbd6d2c8c8d2d4d5d8d4d5d5ded8cfdedf95cddecf">Contact</a>
+      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#0b787b64657864794b66627878626465686465656e687f6e6f257d6e7f">Become a Sponsor</a>
+      <a class="l-footer-link" href="/cdn-cgi/l/email-protection#6b030e0707042b06021818020405080405050e081f0e0f451d0e1f">Contact</a>
     </div>
   </footer>
 </div>
@@ -354,7 +355,7 @@
       <h4 style="margin:16px 0 6px">Data Security</h4>
       <p>All data is encrypted in transit and at rest via Supabase infrastructure. Passwords are hashed and never stored in plain text.</p>
       <h4 style="margin:16px 0 6px">Your Rights</h4>
-      <p>You may request deletion of your account and all associated data at any time by emailing <a href="/cdn-cgi/l/email-protection#dcb4b9b0b0b39cb1b5afafb5b3b2bfb3b2b2b9bfa8b9b8f2aab9a8"><span class="__cf_email__" data-cfemail="fa929f969695ba97938989939594999594949f998e9f9ed48c9f8e">[email&#160;protected]</span></a>.</p>
+      <p>You may request deletion of your account and all associated data at any time by emailing <a href="/cdn-cgi/l/email-protection#d9b1bcb5b5b699b4b0aaaab0b6b7bab6b7b7bcbaadbcbdf7afbcad"><span class="__cf_email__" data-cfemail="8ce4e9e0e0e3cce1e5ffffe5e3e2efe3e2e2e9eff8e9e8a2fae9f8">[email&#160;protected]</span></a>.</p>
       <h4 style="margin:16px 0 6px">No Third-Party Sharing</h4>
       <p>We do not share your data with the VA, insurance companies, attorneys, advertisers, or any other third party. Period.</p>
       <p style="margin-top:16px;color:#9CA3AF;font-size:12px">Last updated: March 2026</p>
@@ -561,7 +562,7 @@
       <div class="loading-wrap">
         <div class="loading-ring"></div>
         <div class="loading-title">Building Your Roadmap</div>
-        <div style="font-size:13px;color:var(--text-sec);margin-bottom:20px">Analyzing your service history and symptoms…</div>
+        <div style="font-size:13px;color:var(--text-sec);margin-bottom:20px">Analyzing your service history and symptoms… <br><span style="font-size:11px;color:var(--text-hint)">This usually takes 15–30 seconds — hang tight.</span></div>
         <!-- Hidden steps for JS timing (still used) -->
         <div id="ls1" style="display:none"></div><div id="ls2" style="display:none"></div>
         <div id="ls3" style="display:none"></div><div id="ls4" style="display:none"></div>
@@ -576,7 +577,7 @@
           <div class="c101-card" id="c101-1">
             <div class="c101-icon">🔗</div>
             <div class="c101-title">Secondary Service Connection</div>
-            <div class="c101-body">Once you win a primary claim, new conditions caused <em>or worsened</em> by that rated condition can be filed as <strong>secondary</strong>. For example: sleep apnea secondary to asthma, or hypertension secondary to PTSD. Burden of proof is lower — the anchor condition does the heavy lifting.</div>
+            <div class="c101-body">Once you win a primary claim, new conditions caused <em>or worsened</em> by that rated condition can be filed as <strong>secondary</strong>. For example: sleep apnea secondary to asthma, or hypertension secondary to PTSD. Burden of proof is lower — the anchor condition does the legal work.</div>
           </div>
           <div class="c101-card" id="c101-2">
             <div class="c101-icon">⚡</div>
@@ -631,6 +632,7 @@
       <div class="a-tb-name">Mission: Connected</div>
     </div>
     <div class="a-tb-right">
+      <div class="a-tb-sponsor">Powered by <strong>Your Sponsor Here</strong></div>
       <div id="networkStatus" class="a-tb-net" onclick="checkNetworkStatus()" title="Click to re-check AI status">
         <span id="netDot" class="net-dot"></span><span id="netLabel" class="net-label">Checking</span>
       </div>
@@ -956,7 +958,7 @@
     </main>
   </div>
   <div class="app-disclaimer">
-    <strong>⚠️ Important Disclaimer:</strong> Mission: Connected is an independent educational tool built by veterans, for veterans. Not affiliated with the VA. Content is for informational purposes only — not a substitute for professional guidance. For formal claim representation, consult an accredited VSO or VA attorney. Your data is never shared with any third party.
+    <strong>⚠️ Important Disclaimer:</strong> Mission: Connected is an independent educational tool built by veterans, for veterans. We are not affiliated with, endorsed by, or acting on behalf of the U.S. Department of Veterans Affairs. Nothing on this platform constitutes legal advice, medical advice, or a formal claim filing. All AI-generated content is for informational and educational purposes only — to help you understand your options and navigate the VA system more confidently. For formal claim representation, consult an accredited VA attorney or Veterans Service Organization (VSO). Your records, notes, and personal data are never shared with any third party, advertiser, or government agency.
   </div>
 </div>
 
