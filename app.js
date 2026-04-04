@@ -6,7 +6,7 @@
 // ── SUPABASE ──
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
 const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
-const CLAUDE_KEY = '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';
+// API key is server-side in Netlify environment variables
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 let sbClient = null;
@@ -26,7 +26,6 @@ let activityLog = [];
 let undoStack = [];
 let notesData = { entries: [], story: { event:[], impact:[], treatment:[], priority:[] } };
 let networkOk = null;
-let notesInitialized = false;
 let deadlines = [];
 
 // ── NOTES ENTRY LOG SYSTEM ──
@@ -39,8 +38,6 @@ function addNoteEntry() {
   ta.value = '';
   persistNotes();
   renderNoteLog();
-  // Force scroll to top of log so user sees new entry
-  setTimeout(() => { const log = document.getElementById('noteLog'); if (log) log.scrollTop = 0; }, 50);
   logActivity('note_added', `📝 Note added`);
 }
 
@@ -54,7 +51,6 @@ function addStoryEntry(category) {
   ta.value = '';
   persistNotes();
   renderStoryLog(category);
-  setTimeout(() => { const log = document.getElementById('slog-' + category); if (log) log.scrollTop = 0; }, 50);
   logActivity('story_entry_added', `📖 Service story entry added`);
 }
 
@@ -185,9 +181,9 @@ async function checkNetworkStatus() {
   label.textContent = 'Checking...';
   try {
     // Ping Claude API with minimal request
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{role:'user',content:'hi'}] })
     });
     networkOk = res.ok || res.status === 529; // 529 = overloaded but reachable
@@ -428,10 +424,7 @@ function showPage(id) {
   if (id === 'activity') renderActivityLog();
   if (id === 'profile') renderProfile();
   if (id === 'records') { updateRecordsStorageBanner(); }
-  if (id === 'notes') {
-    if (!notesInitialized) { loadNotes(); notesInitialized = true; }
-    else { renderNoteLog(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }
-  }
+  if (id === 'notes') { requestAnimationFrame(() => { loadNotes(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }); }
   if (id === 'cpprep') { renderCPPrep(); }
   if (id === 'deadlines') { renderDeadlines(); }
   if (id === 'buddy') { updateBuddyPlaceholders(); }
@@ -1371,7 +1364,7 @@ RETURN THIS JSON STRUCTURE (minified):
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 1800);
+    const data = await callClaude([{role:'user',content:prompt}], 2500);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -1407,14 +1400,8 @@ CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No li
   } catch(e) {
     clearInterval(stepInterval);
     console.error('Roadmap error:', e);
-    const isTimeout = e.message?.includes('504') || e.message?.includes('timed out');
-    const isRate = e.message?.includes('rate') || e.message?.includes('overloaded');
     roadmapData = {
-      summary: isTimeout
-        ? 'Generation timed out — this sometimes happens on first try. Click "Retry Roadmap" below.'
-        : isRate
-        ? 'Our AI is briefly busy — please click "Retry Roadmap" below in ~30 seconds.'
-        : `Error: ${e.message}. Please try again.`,
+      summary: `Error: ${e.message}. ${e.message.includes('rate') ? 'Our AI is briefly busy — please click "Retry Roadmap" below in ~30 seconds.' : 'Please try again.'}`,
       conditions: [], error: e.message, totalConditions: 0
     };
     showView('vApp');
@@ -3389,21 +3376,16 @@ async function callClaude(messages, maxTokens = 800, system = '', retries = 3) {
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/.netlify/functions/claude', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
       // 429 = rate limited, 529 = overloaded — both get exponential backoff retry
-      if (res.status === 429 || res.status === 529 || res.status === 504) {
+      if (res.status === 429 || res.status === 529) {
         if (attempt >= retries) {
-          const label = res.status === 504 ? 'timed out' : res.status === 529 ? 'overloaded' : 'rate limited';
+          const label = res.status === 529 ? 'overloaded' : 'rate limited';
           throw new Error(`API ${label} after ${retries} retries. Please try again in a moment.`);
         }
         // Exponential backoff with jitter: 3s, 9s, 27s (+/- 1s random)
