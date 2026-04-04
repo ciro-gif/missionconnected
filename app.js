@@ -6,7 +6,7 @@
 // ── SUPABASE ──
 const SB_URL = 'https://zspkgvodkyjhclzmyclu.supabase.co';
 const SB_KEY = 'sb_publishable_D45XBwx8QPl6yLe8EIWM3Q_yG2e1kzJ';
-// API key is private — stored in Netlify environment variables
+const CLAUDE_KEY = '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';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 let sbClient = null;
@@ -26,6 +26,7 @@ let activityLog = [];
 let undoStack = [];
 let notesData = { entries: [], story: { event:[], impact:[], treatment:[], priority:[] } };
 let networkOk = null;
+let notesInitialized = false;
 let deadlines = [];
 
 // ── NOTES ENTRY LOG SYSTEM ──
@@ -38,6 +39,8 @@ function addNoteEntry() {
   ta.value = '';
   persistNotes();
   renderNoteLog();
+  // Force scroll to top of log so user sees new entry
+  setTimeout(() => { const log = document.getElementById('noteLog'); if (log) log.scrollTop = 0; }, 50);
   logActivity('note_added', `📝 Note added`);
 }
 
@@ -51,6 +54,7 @@ function addStoryEntry(category) {
   ta.value = '';
   persistNotes();
   renderStoryLog(category);
+  setTimeout(() => { const log = document.getElementById('slog-' + category); if (log) log.scrollTop = 0; }, 50);
   logActivity('story_entry_added', `📖 Service story entry added`);
 }
 
@@ -181,9 +185,9 @@ async function checkNetworkStatus() {
   label.textContent = 'Checking...';
   try {
     // Ping Claude API with minimal request
-    const res = await fetch('/.netlify/functions/claude', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
       body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{role:'user',content:'hi'}] })
     });
     networkOk = res.ok || res.status === 529; // 529 = overloaded but reachable
@@ -424,7 +428,10 @@ function showPage(id) {
   if (id === 'activity') renderActivityLog();
   if (id === 'profile') renderProfile();
   if (id === 'records') { updateRecordsStorageBanner(); }
-  if (id === 'notes') { requestAnimationFrame(() => { loadNotes(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }); }
+  if (id === 'notes') {
+    if (!notesInitialized) { loadNotes(); notesInitialized = true; }
+    else { renderNoteLog(); ['event','impact','treatment','priority'].forEach(renderStoryLog); }
+  }
   if (id === 'cpprep') { renderCPPrep(); }
   if (id === 'deadlines') { renderDeadlines(); }
   if (id === 'buddy') { updateBuddyPlaceholders(); }
@@ -1322,7 +1329,7 @@ async function buildRoadmap() {
 
   const pathwayContext = pathwayLines.join('\n\n');
 
-  const prompt = `You are a rules applicator generating a VA disability roadmap in JSON. You apply ONLY the rules and facts provided below. You do not invent, assume, or add any VA regulations, pathways, or conditions not explicitly stated in this prompt.
+  const prompt = `You are a rules applicator generating a VA disability roadmap in JSON. You apply ONLY the legal rules and facts provided below. You do not invent, assume, or add any VA regulations, pathways, or conditions not explicitly stated in this prompt.
 
 VETERAN PROFILE:
 ${ans.branch?.join('/')} ${ans.component} | MOS ${ans.mos?.code||'?'} ${mosLabel} | ${ans.startYear}-${ans.endYear} | ${ans.discharge} discharge
@@ -1355,17 +1362,16 @@ STRICT RULES — READ CAREFULLY:
 4. For type:presumptive nexus: state which law grants presumption (e.g. "PACT Act 38 CFR 3.309(e) — no nexus letter required to file").
 5. Do NOT cite any CFR section not mentioned in the VERIFIED LEGAL PATHWAY above. If unsure, omit the citation.
 6. targetRating: CPAP machine required=50, daily bronchodilator=30, tinnitus=10 (max), PTSD mild/transient=10 occupational decrease=30 reduced reliability=50 deficiencies most areas=70 total impairment=100, hypertension diastolic 100-109=10 110-119=20 120+=40
-7. Generate ALL conditions supported by this veteran's documented symptoms, diagnoses, MOS, and exposures. Simple profiles: 3-5 conditions. Complex profiles (combat, multiple deployments, multiple symptom categories): up to 8. Never pad. Every condition MUST have a non-empty name field.
+7. 2-4 conditions maximum, each directly tied to documented profile above
 8. options: exactly 2 real choices the veteran faces — not generic instructions
 9. checks: exactly 3 specific action items for this veteran
-10. secondary_opportunities: ALWAYS populate 1-3 secondary conditions the veteran likely qualifies for but may not know about — in a SEPARATE array, never omitted due to token limits.
 
 RETURN THIS JSON STRUCTURE (minified):
-{"summary":"1 concise sentence max 20 words — plain language no legal terminology","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_sequence":"Exactly 5 steps. Format: Step 1: [one sentence]. Step 2: [one sentence]. Each step ONE sentence only. No timing. No parentheticals. Just the action.","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 specific sentence — the most important thing to do RIGHT NOW for this condition, never say see your roadmap","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action","secondary_opportunities":[{"name":"","secondary_to":"","rationale":"why this secondary follows from primary conditions","target_rating":0}]}
+{"summary":"2-3 sentences on this veterans specific legal position","pathway":"PACT_ACT|TERA_DIRECT|AGENT_ORANGE|GULF_WAR|CAMP_LEJEUNE|RADIATION|MST|POW|COMBAT_DIRECT|DIRECT|MIXED","strategy":"1 sentence","filing_sequence":"plain English sequence","totalConditions":N,"conditions":[{"name":"","type":"direct|secondary|presumptive|lay","priority":"high|medium|low","filing_order":N,"targetRating":N,"nexus":"specific nexus for this veteran","evidence_have":"brief","evidence_need":"brief","options":["Option A","Option B"],"action":"1 sentence","secondaryTo":"","cfr":"","checks":["","",""]}],"tdiu":false,"tdiu_note":"","pact_note":"","top_action":"single most important action"}
 CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No line breaks in strings.`;
 
     try {
-    const data = await callClaude([{role:'user',content:prompt}], 2800);
+    const data = await callClaude([{role:'user',content:prompt}], 1800);
     clearInterval(stepInterval);
     const text = data.content?.[0]?.text || '{}';
     // Try code fence first, then bare JSON object
@@ -1381,7 +1387,7 @@ CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No li
     roadmapData = safeParseRoadmapJSON(clean);
 
     // Build conditions from roadmap
-    conditions = roadmapData.conditions?.filter(c => c.name?.trim()).map((c, i) => ({
+    conditions = roadmapData.conditions?.map((c, i) => ({
       id: 'local-'+i, name: c.name, rating: 0, col: 'todo',
       type: c.type, checks: (c.checks||[]).map(ch=>({text:ch,done:false})),
       nexus: c.nexus, evidence_have: c.evidence_have, evidence_need: c.evidence_need,
@@ -1401,8 +1407,14 @@ CRITICAL: Valid minified JSON only. No markdown. No apostrophes in values. No li
   } catch(e) {
     clearInterval(stepInterval);
     console.error('Roadmap error:', e);
+    const isTimeout = e.message?.includes('504') || e.message?.includes('timed out');
+    const isRate = e.message?.includes('rate') || e.message?.includes('overloaded');
     roadmapData = {
-      summary: `Error: ${e.message}. ${e.message.includes('rate') ? 'Our AI is briefly busy — please click "Retry Roadmap" below in ~30 seconds.' : 'Please try again.'}`,
+      summary: isTimeout
+        ? 'Generation timed out — this sometimes happens on first try. Click "Retry Roadmap" below.'
+        : isRate
+        ? 'Our AI is briefly busy — please click "Retry Roadmap" below in ~30 seconds.'
+        : `Error: ${e.message}. Please try again.`,
       conditions: [], error: e.message, totalConditions: 0
     };
     showView('vApp');
@@ -1451,8 +1463,9 @@ function renderRoadmap(data) {
     <div class="rm-hero">
       <div style="font-size:40px">🎯</div>
       <div>
-        <div class="rm-hero-tag">${data.conditions.length} Condition${data.conditions.length!==1?'s':''} Identified</div>
-        <div class="rm-hero-sub" style="font-size:13px;opacity:.85">${data.summary||''}</div>
+        <div class="rm-hero-tag">Your Personalized Blueprint</div>
+        <div class="rm-hero-title">${data.conditions.length} Conditions Identified</div>
+        <div class="rm-hero-sub">${data.summary||''}</div>
       </div>
     </div>
     <div class="legend-bar">
@@ -1498,59 +1511,14 @@ function renderRoadmap(data) {
     return `<div class="rm-section-hdr">${label}</div>` + conds.map(c => renderCondCard(c, typeColors, typeLabels)).join('');
   };
 
-  // Filing strategy — dedicated numbered card
-  const _stratText = data.filing_strategy || data.filing_sequence;
-  if (_stratText) {
-    const _steps = _stratText.split(/(?=Step\s*\d+[\s:(])/i).map(s => s.trim()).filter(s => s.length > 6);
-    const _stepsHtml = _steps.length > 1
-      ? _steps.map((s, i) => {
-          const m = s.match(/^(Step\s*\d+)[^:]*:\s*(.*)/is);
-          const num = m ? m[1] : 'Step ' + (i + 1);
-          const body = (m ? m[2] : s).split(/(?=Step\s*\d+[\s:(])/i)[0].trim();
-          return `<div class="fs-step"><div class="fs-step-num">${num}</div><div class="fs-step-body">${body}</div></div>`;
-        }).join('')
-      : `<div class="fs-step"><div class="fs-step-body">${_stratText}</div></div>`;
-    html += `<div class="filing-strategy-section">
-      <div class="fs-header">
-        <div class="fs-icon">📋</div>
-        <div>
-          <div class="fs-title">Your Filing Strategy</div>
-          <div class="fs-sub">Follow these steps in order — sequence matters</div>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick="requireAuth(()=>showPage('chat'))" style="margin-left:auto;color:white;border-color:rgba(255,255,255,.3)">Ask Aylene →</button>
-      </div>
-      <div class="fs-steps">${_stepsHtml}</div>
-    </div>`;
+  // Filing sequence banner
+  if (data.filing_sequence) {
+    html += `<div class="alert alert-blue" style="margin-bottom:12px"><span>📋</span><span><strong>Filing Strategy:</strong> ${data.filing_sequence}</span></div>`;
   }
 
   html += renderGroup(high, '🔴 High Priority');
   html += renderGroup(mid, '🟡 Medium Priority');
   html += renderGroup(low, '🔵 Lower Priority');
-
-  if (data.secondary_opportunities?.length) {
-    const _secOps = data.secondary_opportunities.filter(s => s.name?.trim());
-    if (_secOps.length) {
-      html += `<div class="secondary-ai-section">
-        <div class="sas-header">
-          <div class="sas-icon">💡</div>
-          <div>
-            <div class="sas-title">Secondary Opportunities You May Not Know About</div>
-            <div class="sas-sub">Based on your primary conditions — these are commonly won and veterans often miss them.</div>
-          </div>
-        </div>
-        ${_secOps.map(s => `
-        <div class="sas-item">
-          <div class="sas-item-left">
-            <div class="sas-name">${s.name} <span class="sas-tag">secondary to ${s.secondary_to || ''}</span></div>
-            <div class="sas-rationale">${s.rationale}</div>
-            ${(s.target_rating||0) > 0 ? `<div class="sas-rating">Target rating: ${s.target_rating}%</div>` : `<div class="sas-rating">0% rated + SMC-K (~$130/mo added to your compensation)</div>`}
-          </div>
-          <button class="btn btn-outline btn-sm" onclick="askAyleneAboutSecondary('${(s.name||'').replace(/'/g,"\\'")}','${(s.secondary_to||'').replace(/'/g,"\\'")}')">Ask Aylene</button>
-        </div>`).join('')}
-        <div class="sas-footer">Educational suggestions only. Consult an accredited VSO before filing.</div>
-      </div>`;
-    }
-  }
 
   if (data.top_action) {
     html += `<div class="rm-action-bar">
@@ -2109,7 +2077,7 @@ function printRoadmap() {
         ${c.secondaryTo ? `<span style="font-size:11px;color:#666">↳ Secondary to ${c.secondaryTo}</span>` : ''}
         ${c.cfr ? `<span style="font-size:10px;color:#999">${c.cfr}</span>` : ''}
       </div>
-      ${c.nexus ? `<div style="margin-bottom:8px;padding:6px 8px;background:#EFF6FF;border-left:3px solid #0050A0;border-radius:3px"><span style="font-weight:700;color:#0050A0;font-size:11px;text-transform:uppercase">Nexus / Claim Basis: </span><span style="font-size:12px">${c.nexus}</span></div>` : ''}
+      ${c.nexus ? `<div style="margin-bottom:8px;padding:6px 8px;background:#EFF6FF;border-left:3px solid #0050A0;border-radius:3px"><span style="font-weight:700;color:#0050A0;font-size:11px;text-transform:uppercase">Nexus / Legal Basis: </span><span style="font-size:12px">${c.nexus}</span></div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         ${c.evidence_have ? `<div style="padding:6px 8px;background:#F0FDF4;border-left:3px solid #16A34A;border-radius:3px"><div style="font-weight:700;color:#16A34A;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence You Have</div><div style="font-size:12px">${c.evidence_have}</div></div>` : ''}
         ${c.evidence_need ? `<div style="padding:6px 8px;background:#FFF5F5;border-left:3px solid #DC2626;border-radius:3px"><div style="font-weight:700;color:#DC2626;font-size:10px;text-transform:uppercase;margin-bottom:2px">Evidence Still Needed</div><div style="font-size:12px">${c.evidence_need}</div></div>` : ''}
@@ -2507,7 +2475,7 @@ async function sendMessage() {
       `\n- Service: ${ans.startYear || '?'}–${ans.endYear || 'Present'}, Discharge: ${ans.discharge || 'Unknown'}` +
       `\n- Deployments: ${ans.deployments?.join(', ') || 'None listed'}` +
       `\n- Exposures: ${ans.exposures?.join(', ') || 'None listed'}` +
-      `\n- Pathway: ${roadmapData?.pathway || 'DIRECT'}` +
+      `\n- Legal pathway: ${roadmapData?.pathway || 'DIRECT'}` +
       `\n- Conditions in roadmap: ${(roadmapData?.conditions || conditions).map(c => c.name + (c.type === 'presumptive' ? ' (presumptive)' : c.type === 'secondary' ? ' (secondary to ' + (c.secondaryTo || '?') + ')' : ' (direct)')).join(', ')}` +
       `\n- Current VA status: ${ans.vaStatus || 'none'}, Prior ratings: ${ans.ratedConds?.join(', ') || 'none'}` +
       (() => {
@@ -2914,12 +2882,12 @@ function showLandingMoment(data) {
   overlay.innerHTML = `
     <div style="max-width:560px;text-align:center;color:#fff">
       <div style="font-size:56px;margin-bottom:16px">🎯</div>
-      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;margin-bottom:12px">Your Roadmap Is Ready</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;margin-bottom:12px">Your Personalized Blueprint Is Ready</div>
       <div style="font-size:28px;font-weight:700;font-family:'Oswald',sans-serif;margin-bottom:16px">${condCount} Potential Claim${condCount !== 1 ? 's' : ''} Identified</div>
       <div style="font-size:15px;color:rgba(255,255,255,0.8);line-height:1.6;margin-bottom:14px">${data.summary || ''}</div>
       ${pathwayLabel ? `<div style="display:inline-block;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#C9A84C;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:20px">${pathwayLabel}</div>` : ''}
       <div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:28px;padding:0 8px">
-        What you shared matters. These conditions reflect your specific service history — not a generic checklist. The options shown are yours to decide. Review each condition carefully and use Ask Aylene for guidance at any point.
+        What you shared matters. These conditions reflect your specific legal position — not a generic checklist. The options shown are yours to decide. Review each condition carefully and use Ask Aylene for guidance at any point.
       </div>
       <button onclick="closeLandingMoment()" style="background:#C9A84C;color:#002855;border:none;padding:14px 40px;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:.04em">View My Roadmap →</button>
     </div>`;
@@ -3416,21 +3384,26 @@ function stopC101Carousel() {
 
 // ── CLAUDE API ──
 async function callClaude(messages, maxTokens = 800, system = '', retries = 3) {
-  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 4000), messages };
+  const body = { model: CLAUDE_MODEL, max_tokens: Math.min(maxTokens, 3000), messages };
   if (system) body.system = system;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch('/.netlify/functions/claude', {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
         body: JSON.stringify(body)
       });
 
       // 429 = rate limited, 529 = overloaded — both get exponential backoff retry
-      if (res.status === 429 || res.status === 529) {
+      if (res.status === 429 || res.status === 529 || res.status === 504) {
         if (attempt >= retries) {
-          const label = res.status === 529 ? 'overloaded' : 'rate limited';
+          const label = res.status === 504 ? 'timed out' : res.status === 529 ? 'overloaded' : 'rate limited';
           throw new Error(`API ${label} after ${retries} retries. Please try again in a moment.`);
         }
         // Exponential backoff with jitter: 3s, 9s, 27s (+/- 1s random)
